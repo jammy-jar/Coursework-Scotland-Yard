@@ -4,7 +4,9 @@ import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
@@ -76,25 +78,52 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public GameSetup getSetup() {
-			return null;
+			return setup;
 		}
 
 		@Nonnull
 		@Override
 		public ImmutableSet<Piece> getPlayers() {
-			return null;
+			Set<Piece> piecesSet = new HashSet<>();
+			piecesSet.add(mrX.piece());
+
+			// Map detective 'Players' to detective 'Pieces'.
+			List<Piece> detectivePieces = detectives.stream().map(d -> d.piece()).toList();
+			piecesSet.addAll(detectivePieces);
+
+			return ImmutableSet.copyOf(piecesSet);
 		}
 
 		@Nonnull
 		@Override
 		public Optional<Integer> getDetectiveLocation(Piece.Detective detective) {
+			for (Player d : detectives) {
+				if (d.piece() == detective) return Optional.of(d.location());
+			}
 			return Optional.empty();
 		}
 
 		@Nonnull
 		@Override
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-			return Optional.empty();
+			// Find the detective to match the piece (optional as may be mrX).
+			Optional<Player> player = detectives.stream().filter(d -> d.piece() == piece).findFirst();
+			if (piece.isMrX()) player = Optional.of(mrX);
+
+			if (player.isEmpty()) return Optional.empty();
+			// We know player is Present.
+			Player concreteP = player.get();
+
+			ImmutableMap<ScotlandYard.Ticket, Integer> tickets = concreteP.tickets();
+
+			TicketBoard tBoard = new TicketBoard() {
+				@Override
+				public int getCount(@Nonnull ScotlandYard.Ticket ticket) {
+					return tickets.get(ticket);
+				}
+			};
+
+			return Optional.of(tBoard);
 		}
 
 		@Nonnull
