@@ -34,27 +34,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 if (detectives.stream().noneMatch(d -> d.location() == destination)) {
                     for (ScotlandYard.Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {
                         if (player.has(t.requiredTicket())) {
-                            Move.SingleMove move = new Move.SingleMove(
-                                    player.piece(), source, t.requiredTicket(), destination
-                            );
+                            Move.SingleMove move = new Move.SingleMove(player.piece(), source, t.requiredTicket(), destination);
                             singleMoves.add(move);
                         }
                     }
 
                     if (!player.isDetective() && player.has(ScotlandYard.Ticket.SECRET)) {
-                        Move.SingleMove move = new Move.SingleMove(
-                                player.piece(), source, ScotlandYard.Ticket.SECRET, destination
-                        );
+                        Move.SingleMove move = new Move.SingleMove(player.piece(), source, ScotlandYard.Ticket.SECRET, destination);
                         singleMoves.add(move);
                     }
                 }
             }
+
             return singleMoves;
         }
 
         private static Set<Move.DoubleMove> makeDoubleMoves(GameSetup setup, List<Player> detectives, Player player, int source) {
             Set<Move.DoubleMove> doubleMoves = new HashSet<Move.DoubleMove>();
 
+            // Validate if double moves can be made.
             if (!player.has(ScotlandYard.Ticket.DOUBLE)) return doubleMoves;
             if (setup.moves.size() < 2) return doubleMoves;
 
@@ -65,7 +63,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 for (Move.SingleMove sMove2 : singleMoves2) {
                     // Check if tickets are repeated, if not then continue, if they are then also check there's at least 2.
                     if (sMove1.ticket != sMove2.ticket
-                    || sMove1.ticket == sMove2.ticket && player.hasAtLeast(sMove1.ticket, 2)) {
+                            || sMove1.ticket == sMove2.ticket && player.hasAtLeast(sMove1.ticket, 2)) {
                         Move.DoubleMove dMove = new Move.DoubleMove(
                                 player.piece(), source, sMove1.ticket, sMove1.destination, sMove2.ticket, sMove2.destination
                         );
@@ -75,6 +73,35 @@ public final class MyGameStateFactory implements Factory<GameState> {
             }
 
             return doubleMoves;
+        }
+
+        private void validateConstructor() {
+            if (setup == null) throw new NullPointerException("Setup is null!");
+            if (mrX == null) throw new NullPointerException("MrX is null!");
+            if (detectives == null) throw new NullPointerException("Detectives is null!");
+
+            Set<Piece> seenPieces = new HashSet<Piece>();
+            Set<Integer> seenLocations = new HashSet<Integer>();
+            for (Player d : detectives) {
+                if (d == null) throw new NullPointerException("At least one detective is null!");
+                if (d.isMrX()) throw new IllegalArgumentException("MrX cannot be a detective!");
+
+                if (seenPieces.contains(d.piece()))
+                    throw new IllegalArgumentException("More than one detective repeated!");
+                seenPieces.add(d.piece());
+                if (seenLocations.contains(d.location()))
+                    throw new IllegalArgumentException("More than one detective is in the same position!");
+                seenLocations.add(d.location());
+
+                if (d.has(ScotlandYard.Ticket.SECRET) || d.has(ScotlandYard.Ticket.DOUBLE))
+                    throw new IllegalArgumentException("A detective should not have a secret or double ticket!");
+            }
+
+            if (!mrX.isMrX()) throw new IllegalArgumentException("There was no MrX!");
+            if (mrX.isDetective()) throw new IllegalArgumentException("MrX is a detective!");
+
+            if (setup.moves.isEmpty()) throw new IllegalArgumentException("The moves are empty!");
+            if (setup.graph.nodes().isEmpty()) throw new IllegalArgumentException("The Graph is empty!");
         }
 
         private MyGameState(
@@ -90,48 +117,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.mrX = mrX;
             this.detectives = detectives;
 
-            if (setup == null) throw new NullPointerException("Setup is null!");
-            if (mrX == null) throw new NullPointerException("MrX is null!");
-            if (detectives == null) throw new NullPointerException("Detectives is null!");
+            validateConstructor();
 
-            Set<Piece> seenPieces = new HashSet<Piece>();
-            Set<Integer> seenLocations = new HashSet<Integer>();
+            // Initialise all available moves.
             Set<Move> pMoves = new HashSet<Move>();
-            for (Player d : detectives) {
-                if (d == null) throw new NullPointerException("At least one detective is null!");
-                if (d.isMrX()) throw new IllegalArgumentException("MrX cannot be a detective!");
-
-                if (seenPieces.contains(d.piece()))
-                    throw new IllegalArgumentException("More than one detective repeated!");
-                seenPieces.add(d.piece());
-                if (seenLocations.contains(d.location()))
-                    throw new IllegalArgumentException("More than one detective is in the same position!");
-                seenLocations.add(d.location());
-
-                if (d.has(ScotlandYard.Ticket.SECRET) || d.has(ScotlandYard.Ticket.DOUBLE))
-                    throw new IllegalArgumentException("A detective should not have a secret or double ticket!");
-
-                pMoves.addAll(makeSingleMoves(setup, detectives, d, d.location()));
-            }
-
-
-            if (!mrX.isMrX())
-                throw new IllegalArgumentException("There was no MrX!");
-
-            if (mrX.isDetective())
-                throw new IllegalArgumentException("MrX is a detective!");
-
-            if (setup.moves.isEmpty()) throw new IllegalArgumentException("The moves are empty!");
-            if (setup.graph.nodes().isEmpty()) throw new IllegalArgumentException("The Graph is empty!");
-
+            for (Player detective : detectives)
+                    pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
             pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
             pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
-
             moves = ImmutableSet.copyOf(pMoves);
         }
 
         private Optional<Player> getPlayerByPiece(Piece piece) {
-            // Find the detective to match the piece (optional as may be mrX).
+            // Find the detective to match the piece (if available).
             Optional<Player> player = detectives.stream().filter(d -> d.piece() == piece).findFirst();
             if (piece.isMrX()) player = Optional.of(mrX);
 
@@ -174,13 +172,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
             Player concreteP = player.get();
 
             ImmutableMap<ScotlandYard.Ticket, Integer> tickets = concreteP.tickets();
-
-            TicketBoard tBoard = new TicketBoard() {
-                @Override
-                public int getCount(@Nonnull ScotlandYard.Ticket ticket) {
-                    return tickets.get(ticket);
-                }
-            };
+            // Lambda to define the one function that a ticket board has.
+            TicketBoard tBoard = ticket -> tickets.get(ticket);
 
             return Optional.of(tBoard);
         }
@@ -206,7 +199,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Nonnull
         @Override
         public GameState advance(Move move) {
-            if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
+            if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
             Move.Visitor<GameState> visitor = new Move.Visitor<>() {
                 @Override
@@ -215,7 +208,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         // TODO
                     }
 //                    Optional<Player> player = getPlayerByPiece(move.commencedBy());
-//                    if (player.isEmpty()) throw new NullPointerException("The piece that commenced the move does not have a corresponding player!");
+//                    if (player.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
 //                    Player concreteP = player.get();
 //
 //                    Map<ScotlandYard.Ticket, Integer> tickets = concreteP.tickets();
