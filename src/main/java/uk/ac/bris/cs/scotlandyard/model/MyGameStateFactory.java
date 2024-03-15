@@ -124,7 +124,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
             } else {
                 for (Player detective : detectives)
                     // TODO Only remaining detectives are checked
-                    pMoves.addAll(makeSingleMoves(setup, remaining, detective, detective.location()));
+                    pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
             }
 
             moves = ImmutableSet.copyOf(pMoves);
