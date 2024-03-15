@@ -188,7 +188,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Nonnull
         @Override
         public ImmutableList<LogEntry> getMrXTravelLog() {
-            return null;
+            return log;
         }
 
         @Nonnull
@@ -212,7 +212,33 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 @Override
                 public GameState visit(Move.SingleMove move) {
                     if (move.commencedBy().isMrX()) {
-                        // TODO
+                        // Move number starts at zero
+                        int currentMove = log.size();
+
+                        LogEntry entry;
+                        // Check if move is a reveal move.
+                        if (setup.moves.get(currentMove)) entry = LogEntry.reveal(move.ticket, move.destination);
+                        else entry = LogEntry.hidden(move.ticket);
+
+                        List<LogEntry> newLog = new ArrayList<>(List.copyOf(log));
+                        newLog.add(entry);
+                        ImmutableList<LogEntry> newLogIm = ImmutableList.copyOf(newLog);
+
+                        Map<ScotlandYard.Ticket, Integer> tickets = mrX.tickets();
+                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
+
+                        int location = move.destination;
+
+                        // The detectives turn is next.
+                        ImmutableSet<Piece> remaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
+
+                        return new MyGameState(
+                                setup,
+                                remaining,
+                                newLogIm,
+                                new Player(mrX.piece(), ImmutableMap.copyOf(tickets), location),
+                                detectives
+                        );
                     }
 //                    Optional<Player> player = getPlayerByPiece(move.commencedBy());
 //                    if (player.isEmpty()) throw new NullPointerException("The piece that commenced the move does not have a corresponding player!");
@@ -222,7 +248,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 //                    tickets.put(move.ticket, tickets.get(move.ticket) - 1);
 //
 //                    Player newPlayer = new Player(concreteP.piece(), ImmutableMap.copyOf(tickets), move.destination);
-//                    return new MyGameStateFactory().build(
+//                    return new MyGameStateFactory(
 //                            setup,
 //                            newPlayer,
 //                            ImmutableList.copyOf(detectives)
