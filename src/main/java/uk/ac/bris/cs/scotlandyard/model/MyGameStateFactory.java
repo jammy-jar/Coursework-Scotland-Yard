@@ -1,12 +1,9 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.*;
 
 import javax.annotation.Nonnull;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
@@ -121,10 +118,15 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
             // Initialise all available moves.
             Set<Move> pMoves = new HashSet<Move>();
-            for (Player detective : detectives)
-                    pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
-            pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
-            pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
+            if (remaining.contains(Piece.MrX.MRX)) {
+                pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
+                pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
+            } else {
+                for (Player detective : detectives)
+                    // TODO Only remaining detectives are checked
+                    pMoves.addAll(makeSingleMoves(setup, remaining, detective, detective.location()));
+            }
+
             moves = ImmutableSet.copyOf(pMoves);
         }
 
@@ -204,7 +206,37 @@ public final class MyGameStateFactory implements Factory<GameState> {
             Move.Visitor<GameState> visitor = new Move.Visitor<>() {
                 @Override
                 public GameState visit(Move.SingleMove move) {
+                    Map<ScotlandYard.Ticket, Integer> tickets;
                     if (move.commencedBy().isMrX()) {
+                        tickets = mrX.tickets();
+                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
+                    } else {
+                        Optional<Player> playerO = getPlayerByPiece(move.commencedBy());
+                        if (playerO.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
+                        tickets = playerO.get().tickets();
+                        // TODO Add ticket mrX
+                        Map<ScotlandYard.Ticket, Integer> mrXTickets = mrX.tickets();
+
+                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
+                    }
+
+
+                    int location = move.destination;
+
+                    Player newMrX = new Player(mrX.piece(), ImmutableMap.copyOf(tickets), location);
+                    Player newPlayer;
+                    if (move.commencedBy().isDetective())
+                        newPlayer = new Player(move.commencedBy(), ImmutableMap.copyOf(tickets), location);
+                    else newPlayer = mrX;
+
+                    ImmutableList<LogEntry> newLogIm = log;
+                    List<Player> newDetectives = detectives;
+
+                    ImmutableSet<Piece> newRemaining;
+                    if (move.commencedBy().isMrX()) {
+                        // The detectives turn is next.
+                        newRemaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
+
                         // Move number starts at zero
                         int currentMove = log.size();
 
@@ -215,38 +247,27 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
                         List<LogEntry> newLog = new ArrayList<>(List.copyOf(log));
                         newLog.add(entry);
-                        ImmutableList<LogEntry> newLogIm = ImmutableList.copyOf(newLog);
+                        newLogIm = ImmutableList.copyOf(newLog);
+                    } else {
+                        Set<Piece> remainingTemp = remaining;
+                        remainingTemp.remove(move.commencedBy());
+                        newRemaining = ImmutableSet.copyOf(remainingTemp);
 
-                        Map<ScotlandYard.Ticket, Integer> tickets = mrX.tickets();
-                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
-
-                        int location = move.destination;
-
-                        // The detectives turn is next.
-                        ImmutableSet<Piece> remaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
-
-                        return new MyGameState(
-                                setup,
-                                remaining,
-                                newLogIm,
-                                new Player(mrX.piece(), ImmutableMap.copyOf(tickets), location),
-                                detectives
-                        );
+                        // Creates a copy of the set that is not immutable.
+                        newDetectives = Lists.newArrayList(detectives);
+                        newDetectives.removeIf(d -> d.piece() == move.commencedBy());
+                        newDetectives.add(newPlayer);
                     }
-//                    Optional<Player> player = getPlayerByPiece(move.commencedBy());
-//                    if (player.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
-//                    Player concreteP = player.get();
-//
-//                    Map<ScotlandYard.Ticket, Integer> tickets = concreteP.tickets();
-//                    tickets.put(move.ticket, tickets.get(move.ticket) - 1);
-//
-//                    Player newPlayer = new Player(concreteP.piece(), ImmutableMap.copyOf(tickets), move.destination);
-//                    return new MyGameStateFactory(
-//                            setup,
-//                            newPlayer,
-//                            ImmutableList.copyOf(detectives)
-//                    );
-                    return null;
+
+                    // TODO If no remaining detectives, its mrX's turn.
+
+                    return new MyGameState(
+                            setup,
+                            newRemaining,
+                            newLogIm,
+                            newMrX,
+                            newDetectives
+                    );
                 }
 
                 @Override
