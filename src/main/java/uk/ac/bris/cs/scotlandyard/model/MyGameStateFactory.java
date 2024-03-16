@@ -101,6 +101,22 @@ public final class MyGameStateFactory implements Factory<GameState> {
             if (setup.graph.nodes().isEmpty()) throw new IllegalArgumentException("The Graph is empty!");
         }
 
+        private void initMoves() {
+            // Initialise all available moves.
+            // TODO Use immutable set builder
+            Set<Move> pMoves = new HashSet<Move>();
+            if (remaining.contains(Piece.MrX.MRX)) {
+                pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
+                pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
+            } else {
+                for (Player detective : detectives)
+                    // TODO Only remaining detectives are checked
+                    pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
+            }
+
+            this.moves = ImmutableSet.copyOf(pMoves);
+        }
+
         private MyGameState(
                 final GameSetup setup,
                 final ImmutableSet<Piece> remaining,
@@ -115,19 +131,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.detectives = detectives;
 
             validateConstructor();
-
-            // Initialise all available moves.
-            Set<Move> pMoves = new HashSet<Move>();
-            if (remaining.contains(Piece.MrX.MRX)) {
-                pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
-                pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
-            } else {
-                for (Player detective : detectives)
-                    // TODO Only remaining detectives are checked
-                    pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
-            }
-
-            moves = ImmutableSet.copyOf(pMoves);
+            initMoves();
         }
 
         private Optional<Player> getPlayerByPiece(Piece piece) {
@@ -203,23 +207,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
         public GameState advance(Move move) {
             if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
+            // TODO Move to a new class.
             Move.Visitor<GameState> visitor = new Move.Visitor<>() {
                 @Override
                 public GameState visit(Move.SingleMove move) {
-                    Map<ScotlandYard.Ticket, Integer> tickets;
-                    if (move.commencedBy().isMrX()) {
-                        tickets = mrX.tickets();
-                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
-                    } else {
-                        Optional<Player> playerO = getPlayerByPiece(move.commencedBy());
-                        if (playerO.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
-                        tickets = playerO.get().tickets();
+                    Optional<Player> playerO = getPlayerByPiece(move.commencedBy());
+                    if (playerO.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
+                    Map<ScotlandYard.Ticket, Integer> tickets = playerO.get().tickets();
+                    if (move.commencedBy().isDetective()) {
                         // TODO Add ticket mrX
                         Map<ScotlandYard.Ticket, Integer> mrXTickets = mrX.tickets();
-
-                        tickets.put(move.ticket, tickets.get(move.ticket) - 1);
                     }
 
+                    tickets.put(move.ticket, tickets.get(move.ticket) - 1);
 
                     int location = move.destination;
 
@@ -229,13 +229,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         newPlayer = new Player(move.commencedBy(), ImmutableMap.copyOf(tickets), location);
                     else newPlayer = mrX;
 
-                    ImmutableList<LogEntry> newLogIm = log;
-                    List<Player> newDetectives = detectives;
-
                     ImmutableSet<Piece> newRemaining;
+                    // Remove current player from remaining players.
+                    Set<Piece> remainingTemp = remaining;
+                    remainingTemp.remove(move.commencedBy());
+                    // If there's no more players swap turns.
+                    // TODO Possibly change immutableset copy of / of to builders.
+                    if (remainingTemp.isEmpty()) {
+                        if (move.commencedBy().isMrX())
+                            newRemaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
+                        else
+                            newRemaining = ImmutableSet.of(mrX.piece());
+                    } else {
+                        newRemaining = ImmutableSet.copyOf(remainingTemp);
+                    }
+
+                    ImmutableList<LogEntry> newLog;
+                    List<Player> newDetectives;
                     if (move.commencedBy().isMrX()) {
-                        // The detectives turn is next.
-                        newRemaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
+                        newDetectives = detectives;
 
                         // Move number starts at zero
                         int currentMove = log.size();
@@ -245,26 +257,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         if (setup.moves.get(currentMove)) entry = LogEntry.reveal(move.ticket, move.destination);
                         else entry = LogEntry.hidden(move.ticket);
 
-                        List<LogEntry> newLog = new ArrayList<>(List.copyOf(log));
-                        newLog.add(entry);
-                        newLogIm = ImmutableList.copyOf(newLog);
+                        // Add the new log entry.
+                        // TODO Use immutable set builder
+                        List<LogEntry> newLogTemp = new ArrayList<>(List.copyOf(log));
+                        newLogTemp.add(entry);
+                        newLog = ImmutableList.copyOf(newLogTemp);
                     } else {
-                        Set<Piece> remainingTemp = remaining;
-                        remainingTemp.remove(move.commencedBy());
-                        newRemaining = ImmutableSet.copyOf(remainingTemp);
+                        newLog = log;
 
                         // Creates a copy of the set that is not immutable.
+                        // TODO Use immutable set builder
                         newDetectives = Lists.newArrayList(detectives);
                         newDetectives.removeIf(d -> d.piece() == move.commencedBy());
                         newDetectives.add(newPlayer);
                     }
 
-                    // TODO If no remaining detectives, its mrX's turn.
-
                     return new MyGameState(
                             setup,
                             newRemaining,
-                            newLogIm,
+                            newLog,
                             newMrX,
                             newDetectives
                     );
@@ -272,14 +283,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
                 @Override
                 public GameState visit(Move.DoubleMove move) {
-//                    Optional<Player> player = getPlayerByPiece(move.commencedBy());
-//                    if (player.isEmpty()) throw new NullPointerException("The piece that commenced the move does not have a corresponding player!");
-//                    Player concreteP = player.get();
-//
-//                    Map<ScotlandYard.Ticket, Integer> tickets = concreteP.tickets();
 //                    tickets.put(move.ticket1, tickets.get(move.ticket1) - 1);
 //                    tickets.put(move.ticket2, tickets.get(move.ticket2) - 1);
-//                    Player newMrX = new Player(mrX.piece(), ImmutableMap.copyOf(tickets), move.destination2);
                     return null;
                 }
             };
