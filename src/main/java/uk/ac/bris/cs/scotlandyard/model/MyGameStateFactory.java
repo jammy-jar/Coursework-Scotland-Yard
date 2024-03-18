@@ -103,18 +103,37 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
         private void initMoves() {
             // Initialise all available moves.
-            // TODO Use immutable set builder
-            Set<Move> pMoves = new HashSet<Move>();
+            ImmutableSet.Builder<Move> pMoves = ImmutableSet.builder();
             if (remaining.contains(Piece.MrX.MRX)) {
                 pMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
                 pMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
             } else {
                 for (Player detective : detectives)
-                    // TODO Only remaining detectives are checked
                     pMoves.addAll(makeSingleMoves(setup, detectives, detective, detective.location()));
             }
 
-            this.moves = ImmutableSet.copyOf(pMoves);
+            this.moves = pMoves.build();
+        }
+
+        private boolean checkDetectiveMoves(List<Player> players) {
+            return detectives.stream().anyMatch(d -> !makeSingleMoves(setup, detectives, d, d.location()).isEmpty());
+        }
+
+        private void checkWinningConditions() {
+            ImmutableSet<Piece> detectivePieces = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
+            ImmutableSet<Piece> mrXPiece = ImmutableSet.of(mrX.piece());
+
+            if (detectives.stream().anyMatch(d -> d.location() == mrX.location()) ||
+                    (getAvailableMoves().isEmpty() && remaining.contains(mrX.piece()))
+            ) {
+                winner = detectivePieces;
+                moves = ImmutableSet.of();
+            } else if (!checkDetectiveMoves(detectives) || setup.moves.size() == log.size() && remaining.contains(mrX.piece())) {
+                winner = mrXPiece;
+                moves = ImmutableSet.of();
+            } else {
+                winner = ImmutableSet.of();
+            }
         }
 
         private MyGameState(
@@ -132,14 +151,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
             validateConstructor();
             initMoves();
-        }
-
-        private Optional<Player> getPlayerByPiece(Piece piece) {
-            // Find the detective to match the piece (if available).
-            Optional<Player> player = detectives.stream().filter(d -> d.piece() == piece).findFirst();
-            if (piece.isMrX()) player = Optional.of(mrX);
-
-            return player;
+            checkWinningConditions();
         }
 
         @Nonnull
@@ -173,7 +185,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Nonnull
         @Override
         public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-            Optional<Player> player = getPlayerByPiece(piece);
+            // Find the detective to match the piece (if available).
+            Optional<Player> player = detectives.stream().filter(d -> d.piece() == piece).findFirst();
+            if (piece.isMrX()) player = Optional.of(mrX);
+
             if (player.isEmpty()) return Optional.empty();
             Player concreteP = player.get();
 
@@ -199,7 +214,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Nonnull
         @Override
         public ImmutableSet<Move> getAvailableMoves() {
-            return moves;
+            // Extract only moves where player hasn't moved;
+            ImmutableSet.Builder<Move> availableMovesB = ImmutableSet.builder();
+            availableMovesB.addAll(moves.stream().filter(m -> remaining.contains(m.commencedBy())).toList());
+
+            return availableMovesB.build();
         }
 
         @Nonnull
@@ -207,87 +226,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         public GameState advance(Move move) {
             if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
-            // TODO Move to a new class.
-            Move.Visitor<GameState> visitor = new Move.Visitor<>() {
-                @Override
-                public GameState visit(Move.SingleMove move) {
-                    Optional<Player> playerO = getPlayerByPiece(move.commencedBy());
-                    if (playerO.isEmpty()) throw new IllegalArgumentException("The piece that commenced the move does not have a corresponding player!");
-                    Map<ScotlandYard.Ticket, Integer> tickets = playerO.get().tickets();
-                    if (move.commencedBy().isDetective()) {
-                        // TODO Add ticket mrX
-                        Map<ScotlandYard.Ticket, Integer> mrXTickets = mrX.tickets();
-                    }
-
-                    tickets.put(move.ticket, tickets.get(move.ticket) - 1);
-
-                    int location = move.destination;
-
-                    Player newMrX = new Player(mrX.piece(), ImmutableMap.copyOf(tickets), location);
-                    Player newPlayer;
-                    if (move.commencedBy().isDetective())
-                        newPlayer = new Player(move.commencedBy(), ImmutableMap.copyOf(tickets), location);
-                    else newPlayer = mrX;
-
-                    ImmutableSet<Piece> newRemaining;
-                    // Remove current player from remaining players.
-                    Set<Piece> remainingTemp = remaining;
-                    remainingTemp.remove(move.commencedBy());
-                    // If there's no more players swap turns.
-                    // TODO Possibly change immutableset copy of / of to builders.
-                    if (remainingTemp.isEmpty()) {
-                        if (move.commencedBy().isMrX())
-                            newRemaining = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
-                        else
-                            newRemaining = ImmutableSet.of(mrX.piece());
-                    } else {
-                        newRemaining = ImmutableSet.copyOf(remainingTemp);
-                    }
-
-                    ImmutableList<LogEntry> newLog;
-                    List<Player> newDetectives;
-                    if (move.commencedBy().isMrX()) {
-                        newDetectives = detectives;
-
-                        // Move number starts at zero
-                        int currentMove = log.size();
-
-                        LogEntry entry;
-                        // Check if move is a reveal move.
-                        if (setup.moves.get(currentMove)) entry = LogEntry.reveal(move.ticket, move.destination);
-                        else entry = LogEntry.hidden(move.ticket);
-
-                        // Add the new log entry.
-                        // TODO Use immutable set builder
-                        List<LogEntry> newLogTemp = new ArrayList<>(List.copyOf(log));
-                        newLogTemp.add(entry);
-                        newLog = ImmutableList.copyOf(newLogTemp);
-                    } else {
-                        newLog = log;
-
-                        // Creates a copy of the set that is not immutable.
-                        // TODO Use immutable set builder
-                        newDetectives = Lists.newArrayList(detectives);
-                        newDetectives.removeIf(d -> d.piece() == move.commencedBy());
-                        newDetectives.add(newPlayer);
-                    }
-
-                    return new MyGameState(
-                            setup,
-                            newRemaining,
-                            newLog,
-                            newMrX,
-                            newDetectives
-                    );
-                }
-
-                @Override
-                public GameState visit(Move.DoubleMove move) {
-//                    tickets.put(move.ticket1, tickets.get(move.ticket1) - 1);
-//                    tickets.put(move.ticket2, tickets.get(move.ticket2) - 1);
-                    return null;
-                }
-            };
+            Move.Visitor<GameState> visitor = new MoveVisitor(setup, remaining, log, mrX, detectives);
 
             return move.accept(visitor);
         }
@@ -300,5 +239,16 @@ public final class MyGameStateFactory implements Factory<GameState> {
             Player mrX,
             ImmutableList<Player> detectives) {
         return new MyGameState(setup, ImmutableSet.of(Piece.MrX.MRX), ImmutableList.of(), mrX, detectives);
+    }
+
+    @Nonnull
+    public GameState build(
+            GameSetup setup,
+            ImmutableSet<Piece> remaining,
+            ImmutableList<LogEntry> log,
+            Player mrX,
+            ImmutableList<Player> detectives
+            ) {
+        return new MyGameState(setup, remaining, log, mrX, detectives);
     }
 }
