@@ -21,14 +21,14 @@ public final class MyModelFactory implements Factory<Model> {
 		private GameSetup setup;
 		private Player mrX;
 		private ImmutableList<Player> detectives;
-		private ImmutableSet<Observer> observers;
+		private Set<Observer> observers;
 		private Board.GameState state;
 
 		private MyModel(GameSetup setup, Player MrX, ImmutableList<Player> detectives) {
 			this.setup = setup;
 			this.mrX = MrX;
 			this.detectives = detectives;
-			this.observers = ImmutableSet.of();
+			this.observers = new HashSet<>();
 			this.state = new MyGameStateFactory().build(setup, mrX, detectives);
 		}
 
@@ -40,16 +40,24 @@ public final class MyModelFactory implements Factory<Model> {
 
 		@Override
 		public void registerObserver(@Nonnull Observer observer) {
+			if (observer == null) throw new NullPointerException("The observer is null!");
+			if (observers.contains(observer))
+				throw new IllegalArgumentException("This observer already exists.");
+			observers.add(observer);
 		}
 
 		@Override
 		public void unregisterObserver(@Nonnull Observer observer) {
+			if (observer == null) throw new NullPointerException("The observer is null");
+			if (!observers.contains(observer))
+				throw new IllegalArgumentException("This observer was not registered.");
+			observers.remove(observer);
 		}
 
 		@Nonnull
 		@Override
 		public ImmutableSet<Observer> getObservers() {
-			return observers;
+			return ImmutableSet.copyOf(observers);
 		}
 
 		@Override
@@ -66,7 +74,7 @@ public final class MyModelFactory implements Factory<Model> {
 	@Nonnull @Override public Model build(GameSetup setup,
 	                                      Player mrX,
 	                                      ImmutableList<Player> detectives) {
-		// TODO
-		throw new RuntimeException("Implement me!");
+		return new MyModel(setup, mrX, detectives);
+
 	}
 }
