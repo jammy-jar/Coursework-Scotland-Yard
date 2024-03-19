@@ -8,6 +8,7 @@ import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * cw-model
@@ -36,7 +37,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         }
                     }
 
-                    if (!player.isDetective() && player.has(ScotlandYard.Ticket.SECRET)) {
+                    if (player.isMrX() && player.has(ScotlandYard.Ticket.SECRET)) {
                         Move.SingleMove move = new Move.SingleMove(player.piece(), source, ScotlandYard.Ticket.SECRET, destination);
                         singleMoves.add(move);
                     }
@@ -115,20 +116,26 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.moves = pMoves.build();
         }
 
-        private boolean checkDetectiveMoves(List<Player> players) {
+        private boolean checkDetectivesCanMove() {
             return detectives.stream().anyMatch(d -> !makeSingleMoves(setup, detectives, d, d.location()).isEmpty());
+        }
+
+        private boolean checkMrXCornered() {
+            Set<Integer> detectiveLocations = detectives.stream().map(d -> d.location()).collect(Collectors.toSet());
+
+            return makeSingleMoves(setup, detectives, mrX, mrX.location()).stream().allMatch(m -> detectiveLocations.contains(m.destination));
         }
 
         private void checkWinningConditions() {
             ImmutableSet<Piece> detectivePieces = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
             ImmutableSet<Piece> mrXPiece = ImmutableSet.of(mrX.piece());
 
-            if (detectives.stream().anyMatch(d -> d.location() == mrX.location()) ||
-                    (getAvailableMoves().isEmpty() && remaining.contains(mrX.piece()))
-            ) {
+            if (detectives.stream().anyMatch(d -> d.location() == mrX.location())
+            || (getAvailableMoves().isEmpty() && remaining.contains(mrX.piece()))
+            || (checkMrXCornered() && remaining.contains(mrX.piece()))) {
                 winner = detectivePieces;
                 moves = ImmutableSet.of();
-            } else if (!checkDetectiveMoves(detectives) || setup.moves.size() == log.size() && remaining.contains(mrX.piece())) {
+            } else if (!checkDetectivesCanMove() || setup.moves.size() == log.size() && remaining.contains(mrX.piece())) {
                 winner = mrXPiece;
                 moves = ImmutableSet.of();
             } else {
@@ -225,10 +232,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Override
         public GameState advance(Move move) {
             if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
-
-            Move.Visitor<GameState> visitor = new MoveVisitor(setup, remaining, log, mrX, detectives);
-
-            return move.accept(visitor);
+            return move.accept(new MoveVisitor(setup, remaining, log, mrX, detectives));
         }
     }
 

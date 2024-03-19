@@ -4,10 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MoveVisitor implements Move.Visitor<Board.GameState> {
@@ -50,12 +47,25 @@ public class MoveVisitor implements Move.Visitor<Board.GameState> {
             newPlayer = player.use(move.ticket).at(location);
         else newPlayer = newMrX;
 
+
+        Set<Piece> ticketlessPieces = new HashSet<>();
+        for (Player detective : detectives) {
+            Set<ScotlandYard.Ticket> ownedTickets = new HashSet<>();
+            for (ScotlandYard.Ticket ticket : ScotlandYard.Ticket.values()) {
+                if (detective.has(ticket))
+                    ownedTickets.add(ticket);
+            }
+            if (ownedTickets.isEmpty()) ticketlessPieces.add(detective.piece());
+        }
+
         // Remove current player from remaining players.
         ImmutableSet.Builder<Piece> newRemainingB = ImmutableSet.builder();
         // Add all players in remaining exl the one which just played.
-        newRemainingB.addAll(remaining.stream().filter(p -> p != move.commencedBy()).toList());
+        newRemainingB.addAll(remaining.stream().filter(p ->
+                p != move.commencedBy() && !ticketlessPieces.contains(p)
+        ).toList());
         // If there's no more players swap turns.
-        if (remaining.size() - 1 == 0) {
+        if (newRemainingB.build().isEmpty()) {
             if (move.commencedBy().isMrX())
                 newRemainingB.addAll(detectives.stream().map(d -> d.piece()).toList());
             else
