@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tree<T> {
-    private Node root;
+    private final Node root;
 
     public Tree(Move move, AiState state, T rootValue) {
         this.root = new Node(null, move, state, rootValue);
@@ -19,11 +19,11 @@ public class Tree<T> {
 
     public class Node {
         private int visits;
-        private Move move;
-        private AiState state;
+        private final Move move;
+        private final AiState state;
         private T value;
-        private Node parent;
-        private List<Node> children;
+        private final Node parent;
+        private final List<Node> children;
 
         public Node(Node parent, Move move, AiState state, T value) {
             this.move = move;

@@ -4,5 +4,5 @@ public enum Heuristic {
     NONE,
     MCD,
     MTD,
-    CAL;
+    CAL
 }

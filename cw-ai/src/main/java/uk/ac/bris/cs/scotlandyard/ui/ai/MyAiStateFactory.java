@@ -8,6 +8,17 @@ import java.util.*;
 
 public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
+    @Nonnull
+    @Override
+    public AiState build(Board.GameState state) {
+        return new MyAiState(state, Utils.initDetectiveLocations(state), new HashSet<>(ScotLandYardAi.MRX_START_LOCATIONS), Map.of(), 0);
+    }
+
+    @Nonnull
+    public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations, Map<Integer, Category> categoryMap, int assumedMrXLocation) {
+        return new MyAiState(state, Utils.initDetectiveLocations(state), possibleMrXLocations, categoryMap, assumedMrXLocation);
+    }
+
     private class MyAiState implements AiState {
         private final Board.GameState state;
         private final Optional<Piece> turn;
@@ -15,6 +26,22 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private final Set<Integer> detectiveLocations;
         private final Map<Integer, Category> categoryMap;
         private final Integer assumedMrXLocation;
+
+        public MyAiState(Board.GameState state, Set<Integer> detectiveLocations, Set<Integer> mrXLocations, Map<Integer, Category> categoryMap, Integer assumedMrXLocation) {
+            this.state = state;
+            // Lambda handles 'Optional' location.
+            this.detectiveLocations = detectiveLocations;
+
+            Optional<Piece> currentPlayer;
+            if (state.getAvailableMoves().stream().findFirst().isPresent())
+                currentPlayer = Optional.of(state.getAvailableMoves().stream().findFirst().get().commencedBy());
+            else currentPlayer = Optional.empty();
+            this.turn = currentPlayer;
+
+            this.possibleMrXLocations = mrXLocations;
+            this.categoryMap = categoryMap;
+            this.assumedMrXLocation = assumedMrXLocation;
+        }
 
         // Finding the 'Maximum closest distance'.
         private Move calcMCDHeuristic() {
@@ -84,28 +111,12 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             return moves.get(rand);
         }
 
-        public MyAiState(Board.GameState state, Set<Integer> detectiveLocations, Set<Integer> mrXLocations, Map<Integer, Category> categoryMap, Integer assumedMrXLocation) {
-            this.state = state;
-            // Lambda handles 'Optional' location.
-            this.detectiveLocations = detectiveLocations;
-
-            Optional<Piece> currentPlayer;
-            if (state.getAvailableMoves().stream().findFirst().isPresent())
-                currentPlayer = Optional.of(state.getAvailableMoves().stream().findFirst().get().commencedBy());
-            else currentPlayer = Optional.empty();
-            this.turn = currentPlayer;
-
-            this.possibleMrXLocations = mrXLocations;
-            this.categoryMap = categoryMap;
-            this.assumedMrXLocation = assumedMrXLocation;
-        }
-
         private Set<Integer> calcMrXReachableLocations(Board.GameState newState, Set<Integer> newDetectiveLocations, Integer source, ScotlandYard.Ticket ticket) {
             Set<Integer> locations = new HashSet<>();
             for (Integer destination : newState.getSetup().graph.adjacentNodes(source)) {
                 if (!newDetectiveLocations.contains(destination)) {
                     ImmutableSet<ScotlandYard.Transport> transports = newState.getSetup().graph.edgeValueOrDefault(source, destination, ImmutableSet.of());
-                   if (ticket == ScotlandYard.Ticket.SECRET || transports.stream().anyMatch(t -> t.requiredTicket() == ticket))
+                    if (ticket == ScotlandYard.Ticket.SECRET || transports.stream().anyMatch(t -> t.requiredTicket() == ticket))
                         locations.add(destination);
                 }
             }
@@ -252,24 +263,12 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 newMrXLocations = updatePossibleMrXLocations(this.state, newGameState, newDetectiveLocations, possibleMrXLocations);
                 newCategoryMap = updateLocationCategoryMap(newMrXLocations, newDetectiveLocations);
                 newAssumedMrXLocation = selectAssumedMrXLocation(newCategoryMap);
-            }
-            else {
+            } else {
                 newMrXLocations = this.possibleMrXLocations;
                 newCategoryMap = this.categoryMap;
                 newAssumedMrXLocation = this.assumedMrXLocation;
             }
             return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, newAssumedMrXLocation);
         }
-    }
-
-    @Nonnull
-    @Override
-    public AiState build(Board.GameState state) {
-        return new MyAiState(state, Utils.initDetectiveLocations(state), new HashSet<>(ScotLandYardAi.MRX_START_LOCATIONS), Map.of(), 0);
-    }
-
-    @Nonnull
-    public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations, Map<Integer, Category> categoryMap, int assumedMrXLocation) {
-        return new MyAiState(state, Utils.initDetectiveLocations(state), possibleMrXLocations, categoryMap, assumedMrXLocation);
     }
 }
