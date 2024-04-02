@@ -26,17 +26,6 @@ public class MyAi implements Ai {
 		if (LOOKUP == null)
 			LOOKUP = new LocationDistanceLookup(board);
 
-//		// returns a random move, replace with your own implementation
-//		ImmutableList<Move> moves = board.getAvailableMoves().asList();
-//		int[] moveScores = moves.stream().mapToInt(m -> new MyScoreBoardFactory().build(board).getScore(m)).toArray();
-//		int indexOfMax = 0;
-//		for (int i = 0; i < moveScores.length; i++) {
-//			if (moveScores[i] > moveScores[indexOfMax])
-//				indexOfMax = i;
-//		}
-
-//		return moves.get(indexOfMax);
-
 		Optional<Move> move = new MCTS((Board.GameState) board).run();
 		if (move.isEmpty()) throw new IllegalArgumentException("There are no available moves!");
 		return move.get();

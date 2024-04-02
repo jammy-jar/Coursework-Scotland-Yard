@@ -14,11 +14,6 @@ public class ScotLandYardAi {
 
     public interface Factory<T> {
         @Nonnull
-        T build(Board board);
-    }
-
-    public interface StateFactory<T> {
-        @Nonnull
         T build(Board.GameState state);
     }
 }
