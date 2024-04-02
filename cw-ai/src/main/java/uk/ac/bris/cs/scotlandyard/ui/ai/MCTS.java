@@ -16,7 +16,7 @@ public class MCTS {
 
     public MCTS(Board.GameState state) {
         this.ai = Ai.MRX;
-        this.tree = new Tree<>(null, state, 0.0);
+        this.tree = new Tree<>(null, new MyAiStateFactory().build(state), 0.0);
     }
 
     private double calcScoreOfNode(Tree<Double>.Node node) {
@@ -47,30 +47,29 @@ public class MCTS {
     public Tree<Double>.Node expansion(Tree<Double>.Node node) {
         if (node.getVisits() == 0) return node;
 
-        Board.GameState state = node.getGameState();
+        AiState state = node.getState();
         // If no available moves don't make a move.
-        if (state.getAvailableMoves().isEmpty())
+        if (state.getGameState().getAvailableMoves().isEmpty())
             node.addChild(null, state, 0.0);
-        for (Move move : state.getAvailableMoves())
+        for (Move move : state.getGameState().getAvailableMoves())
             node.addChild(move, state.advance(move), 0.0);
-        System.out.println("Expansion ran");
         return node.getChildren().get(0);
     }
 
     public double playOut(Tree<Double>.Node node) {
         Random random = new Random();
-        AiState aiState = new MyAiStateFactory().build(node.getGameState());
+        AiState aiState = new MyAiStateFactory().build(node.getState().getGameState(), node.getState().getPossibleMrXLocations(), node.getState().getCategoryMap(), node.getState().getAssumedMrXLocation());
         // Get a double between 0.0 & 1.0.
         while(aiState.getGameState().getWinner().isEmpty()) {
             double randNum = random.nextDouble();
             boolean useHeuristic = randNum > (ai == Ai.MRX ? MRX_EPSILON : DETECTIVE_EPSILON);
             if (useHeuristic) {
                 // MCD for the MrX, and MTD for the detective is the best heuristic when the Ai is MrX
-                if (ai == Ai.MRX) aiState = aiState.advance(Heuristic.MCD, Heuristic.MTD);
+                if (ai == Ai.MRX) aiState = aiState.advance(aiState.applyHeuristic(Heuristic.MCD, Heuristic.MTD));
                     // MCD for the MrX, and CAL for the detective is the best heuristic when the Ai is Detectives.
-                else if (ai == Ai.DETECTIVES) aiState = aiState.advance(Heuristic.MCD, Heuristic.CAL);
+                else if (ai == Ai.DETECTIVES) aiState = aiState.advance(aiState.applyHeuristic(Heuristic.MCD, Heuristic.CAL));
             } else {
-                aiState = aiState.advance(Heuristic.NONE, Heuristic.NONE);
+                aiState = aiState.advance(aiState.applyHeuristic(Heuristic.NONE, Heuristic.NONE));
             }
         }
 
@@ -102,8 +101,8 @@ public class MCTS {
             backPropagation(expandNode, gameScore);
         }
         if (tree.getRoot().getChildren().isEmpty()) throw new IllegalArgumentException("There are available moves!");
-        Move move = tree.getRoot().getChildren().stream().max(Comparator.comparingInt(n -> n.getVisits())).get().getMove();
-        if (move == null) return Optional.empty();
-        else return Optional.of(move);
+        Optional<Tree<Double>.Node> node = tree.getRoot().getChildren().stream().max(Comparator.comparingInt(n -> n.getVisits()));
+        if (node.isPresent()) return Optional.of(node.get().getMove());
+        else return Optional.empty();
     }
 }

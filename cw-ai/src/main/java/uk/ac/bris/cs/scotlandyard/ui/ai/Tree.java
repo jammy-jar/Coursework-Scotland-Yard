@@ -9,7 +9,7 @@ import java.util.List;
 public class Tree<T> {
     private Node root;
 
-    public Tree(Move move, Board.GameState state, T rootValue) {
+    public Tree(Move move, AiState state, T rootValue) {
         this.root = new Node(null, move, state, rootValue);
     }
 
@@ -18,15 +18,14 @@ public class Tree<T> {
     }
 
     public class Node {
-
         private int visits;
         private Move move;
-        private Board.GameState state;
+        private AiState state;
         private T value;
         private Node parent;
         private List<Node> children;
 
-        public Node(Node parent, Move move, Board.GameState state, T value) {
+        public Node(Node parent, Move move, AiState state, T value) {
             this.move = move;
             this.state = state;
             this.visits = 0;
@@ -43,7 +42,7 @@ public class Tree<T> {
             return this.move;
         }
 
-        public Board.GameState getGameState() {
+        public AiState getState() {
             return this.state;
         }
 
@@ -71,7 +70,7 @@ public class Tree<T> {
             return children.isEmpty();
         }
 
-        public void addChild(Move move, Board.GameState state, T value) {
+        public void addChild(Move move, AiState state, T value) {
             this.children.add(new Node(this, move, state, value));
         }
     }

@@ -4,14 +4,18 @@ import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.Board;
 import uk.ac.bris.cs.scotlandyard.model.Piece;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class Utils {
-    public static ImmutableSet<Piece.Detective> initDetectives(Board board) {
-        ImmutableSet.Builder<Piece.Detective> detectivesB = ImmutableSet.builder();
+    public static Set<Integer> initDetectiveLocations(Board board) {
+        Set<Integer> detectiveLocations = new HashSet<>();
         for (Piece piece : board.getPlayers()) {
             if (piece instanceof Piece.Detective detective) {
-                detectivesB.add(detective);
+                if (board.getDetectiveLocation(detective).isPresent())
+                    detectiveLocations.add(board.getDetectiveLocation(detective).get());
             }
         }
-        return detectivesB.build();
+        return detectiveLocations;
     }
 }
