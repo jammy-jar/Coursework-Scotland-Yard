@@ -10,13 +10,24 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
     @Nonnull
     @Override
-    public AiState build(Board.GameState state) {
-        return new MyAiState(state, Utils.initDetectiveLocations(state), new HashSet<>(ScotLandYardAi.MRX_START_LOCATIONS), Map.of(), 0);
+    public AiState build(Board.GameState state, AiType ai) {
+        Set<Integer> possibleMrXLocations;
+        if (ai == AiType.MRX)
+            possibleMrXLocations = new HashSet<>(ScotLandYardAi.MRX_START_LOCATIONS);
+        else
+            possibleMrXLocations = new HashSet<>(ScotLandYardAi.MRX_SECOND_LOCATIONS);
+
+        return new MyAiState(state, possibleMrXLocations);
+    }
+
+    @Nonnull
+    public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations) {
+        return new MyAiState(state, possibleMrXLocations);
     }
 
     @Nonnull
     public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations, Map<Integer, Category> categoryMap, int assumedMrXLocation) {
-        return new MyAiState(state, Utils.initDetectiveLocations(state), possibleMrXLocations, categoryMap, assumedMrXLocation);
+        return new MyAiState(state, possibleMrXLocations, categoryMap, assumedMrXLocation);
     }
 
     private class MyAiState implements AiState {
@@ -27,10 +38,47 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private final Map<Integer, Category> categoryMap;
         private final Integer assumedMrXLocation;
 
-        public MyAiState(Board.GameState state, Set<Integer> detectiveLocations, Set<Integer> mrXLocations, Map<Integer, Category> categoryMap, Integer assumedMrXLocation) {
+        private Map<Integer, Category> createLocationCategoryMap(Set<Integer> possibleMrXLocations, Set<Integer> detectiveLocations) {
+            HashMap<Integer, Category> map = new HashMap<>();
+            // Assign each location a category based on its distance from the nearest detective.
+            for (Integer location : possibleMrXLocations)
+                map.put(location, new Category(Math.min(MyAi.LOOKUP.getMinDistance(location, detectiveLocations), 5)));
+            return map;
+        }
+
+        private Map<Integer, Double> calcLocationProbabilities(Map<Integer, Category> categoryMap) {
+            HashMap<Integer, Double> probabilities = new HashMap<>();
+            Optional<Double> weightSum = categoryMap.values().stream().map(c -> c.getWeight()).reduce((s, w) -> s + w);
+            if (weightSum.isEmpty())
+                throw new IllegalArgumentException("The category map is empty!");
+            int prevLocation = -1;
+            for (int location : categoryMap.keySet()) {
+                double prevProb = probabilities.isEmpty() ? 0 : probabilities.get(prevLocation);
+                probabilities.put(location, prevProb + categoryMap.get(location).getWeight() / weightSum.get());
+                prevLocation = location;
+            }
+            return probabilities;
+        }
+
+        private Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
+            Map<Integer, Double> locationProbabilities = calcLocationProbabilities(categoryMap);
+            double rand = new Random().nextDouble();
+
+            int catchC = -1;
+            for (int location : categoryMap.keySet()) {
+                if (locationProbabilities.get(location) >= rand)
+                    return location;
+                catchC = location;
+            }
+            if (catchC < 0)
+                throw new IllegalArgumentException("The category map is empty!");
+            return catchC;
+        }
+
+        public MyAiState(Board.GameState state, Set<Integer> mrXLocations, Map<Integer, Category> locationCategorisationMap, int assumedMrXLocation) {
             this.state = state;
             // Lambda handles 'Optional' location.
-            this.detectiveLocations = detectiveLocations;
+            this.detectiveLocations = Utils.initDetectiveLocations(state);
 
             Optional<Piece> currentPlayer;
             if (state.getAvailableMoves().stream().findFirst().isPresent())
@@ -39,8 +87,65 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             this.turn = currentPlayer;
 
             this.possibleMrXLocations = mrXLocations;
-            this.categoryMap = categoryMap;
+            this.categoryMap = locationCategorisationMap;
             this.assumedMrXLocation = assumedMrXLocation;
+        }
+
+        public MyAiState(Board.GameState state, Set<Integer> mrXLocations) {
+            this.state = state;
+            // Lambda handles 'Optional' location.
+            this.detectiveLocations = Utils.initDetectiveLocations(state);
+
+            Optional<Piece> currentPlayer;
+            if (state.getAvailableMoves().stream().findFirst().isPresent())
+                currentPlayer = Optional.of(state.getAvailableMoves().stream().findFirst().get().commencedBy());
+            else currentPlayer = Optional.empty();
+            this.turn = currentPlayer;
+
+            this.possibleMrXLocations = mrXLocations;
+            if (state.getWinner().isEmpty()) {
+                this.categoryMap = createLocationCategoryMap(this.possibleMrXLocations, this.detectiveLocations);
+                this.assumedMrXLocation = selectAssumedMrXLocation(this.categoryMap);
+            } else {
+                this.categoryMap = null;
+                this.assumedMrXLocation = null;
+            }
+        }
+
+        // We apply move filtering so black tickets & double tickets aren't wasted.
+        private List<Move> filterMoves(ImmutableSet<Move> moves) {
+            /* Our Rules:
+            SECRET tickets shouldn't be used when:
+            1. On round 1 or 2.
+            2. MrX reveals his location.
+            3. All edges only have TAXI transport.
+            */
+
+            // Just check for single moves, as most double moves will have at least 1 edge that's not TAXI.
+            Set<ScotlandYard.Ticket> connectingEdges = new HashSet<>();
+            for (int source : moves.stream().filter(m -> m instanceof Move.SingleMove).map(m -> ((Move.SingleMove) m).destination).toList()) {
+                for (int destination : state.getSetup().graph.adjacentNodes(source))
+                    connectingEdges.addAll(state.getSetup().graph.edgeValueOrDefault(source, destination, ImmutableSet.of()).stream().map(t -> t.requiredTicket()).toList());
+            }
+
+            // Apply filter.
+            int round = state.getMrXTravelLog().size() + 1;
+            if (round < 2
+            || round < state.getSetup().moves.size() && state.getSetup().moves.get(round)
+            || connectingEdges.stream().allMatch(t -> t == ScotlandYard.Ticket.TAXI)) {
+                // Filter out SingleMoves or DoubleMoves where one or more of the tickets is a secret ticket.
+                List<Move> filteredMoves = new ArrayList<>();
+                for (Move move : moves) {
+                    if (move instanceof Move.SingleMove s && s.ticket != ScotlandYard.Ticket.SECRET) {
+                        filteredMoves.add(move);
+                    } else if (move instanceof Move.DoubleMove d
+                            && (d.ticket1 != ScotlandYard.Ticket.SECRET && d.ticket2 != ScotlandYard.Ticket.SECRET)
+                    ) {
+                        filteredMoves.add(move);
+                    }
+                }
+                return filteredMoves;
+            } else return moves.stream().toList();
         }
 
         // Finding the 'Maximum closest distance'.
@@ -49,19 +154,21 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             Move maxMove = null;
             if (this.state.getAvailableMoves().isEmpty())
                 throw new IllegalArgumentException("There are no available moves for this player!");
+
+            // TODO Add filter
+            // List<Move> filteredMoves = filterMoves(this.state.getAvailableMoves());
             for (Move move : this.state.getAvailableMoves()) {
                 int distance;
-                if (move instanceof Move.SingleMove)
-                    distance = MyAi.LOOKUP.getMinDistance(((Move.SingleMove) move).destination, detectiveLocations);
-                else {
+                if (move instanceof Move.SingleMove s)
+                    distance = MyAi.LOOKUP.getMinDistance(s.destination, detectiveLocations);
+                else
                     distance = MyAi.LOOKUP.getMinDistance(((Move.DoubleMove) move).destination2, detectiveLocations);
-                }
                 if (distance >= maximum) {
                     maximum = distance;
                     maxMove = move;
                 }
             }
-            if (maxMove == null) throw new NullPointerException();
+            if (maxMove == null) throw new NullPointerException("The optimal move is null!");
             return maxMove;
         }
 
@@ -82,7 +189,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     minMove = move;
                 }
             }
-            if (minMove == null) throw new NullPointerException();
+            if (minMove == null) throw new NullPointerException("The optimal move is null!");
             return minMove;
         }
 
@@ -100,18 +207,59 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     minMove = move;
                 }
             }
-            if (minMove == null) throw new NullPointerException();
+            if (minMove == null) throw new NullPointerException("The optimal move is null!");
             return minMove;
         }
 
         private Move calcRandomMove() {
             List<Move> moves = state.getAvailableMoves().stream().toList();
+            // TODO Add move filter
+//            if (turn.isPresent() && turn.get().isMrX())
+//                moves = filterMoves(state.getAvailableMoves());
+
             int rand = new Random().nextInt(moves.size());
 
             return moves.get(rand);
         }
 
-        private Set<Integer> calcMrXReachableLocations(Board.GameState newState, Set<Integer> newDetectiveLocations, Integer source, ScotlandYard.Ticket ticket) {
+        @Nonnull
+        @Override
+        public Board.GameState getGameState() {
+            return state;
+        }
+
+        @Nonnull
+        @Override
+        public Set<Integer> getPossibleMrXLocations() {
+            return possibleMrXLocations;
+        }
+
+        @Override
+        public Optional<Piece> getTurn() {
+            return turn;
+        }
+
+        @Nonnull
+        @Override
+        public Move applyHeuristic(Heuristic mrXHeuristic, Heuristic detectivesHeuristic) {
+            Move move;
+            if (mrXHeuristic == Heuristic.NONE && detectivesHeuristic == Heuristic.NONE) return calcRandomMove();
+            else if (turn.isPresent() && turn.get().isMrX()) {
+                long initialTime = System.currentTimeMillis();
+                if (mrXHeuristic == Heuristic.MCD) move = calcMCDHeuristic();
+                else throw new IllegalArgumentException("This heuristic is not valid for MrX");
+                EfficiencyCalculator.calcMCDHeuristicTime += System.currentTimeMillis() - initialTime;
+            } else {
+                long initialTime = System.currentTimeMillis();
+                if (detectivesHeuristic == Heuristic.MTD) move = calcMTDHeuristic();
+                else if (detectivesHeuristic == Heuristic.CAL) move = calcCALHeuristic();
+                else throw new IllegalArgumentException("This heuristic is not valid for Detectives");
+                EfficiencyCalculator.calcMTDORCALHeuristicTime += System.currentTimeMillis() - initialTime;
+            }
+            return move;
+        }
+
+        public static Set<Integer> calcMrXReachableLocations(Board.GameState newState, Set<Integer> newDetectiveLocations, Integer source, ScotlandYard.Ticket ticket) {
             Set<Integer> locations = new HashSet<>();
             for (Integer destination : newState.getSetup().graph.adjacentNodes(source)) {
                 if (!newDetectiveLocations.contains(destination)) {
@@ -119,11 +267,12 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     if (ticket == ScotlandYard.Ticket.SECRET || transports.stream().anyMatch(t -> t.requiredTicket() == ticket))
                         locations.add(destination);
                 }
+
             }
             return locations;
         }
 
-        private Set<Integer> updatePossibleMrXLocations(Board.GameState oldState, Board.GameState newState, Set<Integer> newDetectiveLocations, Set<Integer> oldLocations) {
+        public static Set<Integer> updatePossibleMrXLocations(Board.GameState oldState, Board.GameState newState, Set<Integer> newDetectiveLocations, Set<Integer> oldLocations) {
             int moveNum = newState.getMrXTravelLog().size();
             LogEntry latestLog = newState.getMrXTravelLog().get(moveNum - 1);
 
@@ -171,104 +320,18 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             }
         }
 
-        private HashMap<Integer, Category> updateLocationCategoryMap(Set<Integer> mrXLocations, Set<Integer> newDetectiveLocations) {
-            HashMap<Integer, Category> map = new HashMap<>();
-            // Assign each location a category based on its distance from the nearest detective.
-            for (Integer location : mrXLocations)
-                map.put(location, new Category(Math.min(MyAi.LOOKUP.getMinDistance(location, newDetectiveLocations), 5)));
-            return map;
-        }
-
-        private HashMap<Integer, Double> calcLocationProbabilities(Map<Integer, Category> newCategoryMap) {
-            HashMap<Integer, Double> probabilities = new HashMap<>();
-            Optional<Double> weightSum = newCategoryMap.values().stream().map(c -> c.getWeight()).reduce((s, w) -> s + w);
-            if (weightSum.isEmpty())
-                throw new IllegalArgumentException("The category map is empty!");
-            int prevLocation = -1;
-            for (int location : newCategoryMap.keySet()) {
-                double prevProb = probabilities.isEmpty() ? 0 : probabilities.get(prevLocation);
-                probabilities.put(location, prevProb + newCategoryMap.get(location).getWeight() / weightSum.get());
-                prevLocation = location;
-            }
-            return probabilities;
-        }
-
-        private Integer selectAssumedMrXLocation(Map<Integer, Category> newCategoryMap) {
-            HashMap<Integer, Double> locationProbabilities = calcLocationProbabilities(newCategoryMap);
-            double rand = new Random().nextDouble();
-
-            int catchC = -1;
-            for (int location : newCategoryMap.keySet()) {
-                if (locationProbabilities.get(location) >= rand)
-                    return location;
-                catchC = location;
-            }
-            if (catchC < 0)
-                throw new IllegalArgumentException("The category map is empty!");
-            return catchC;
-        }
-
-        @Nonnull
-        @Override
-        public Board.GameState getGameState() {
-            return state;
-        }
-
-        @Nonnull
-        @Override
-        public Set<Integer> getPossibleMrXLocations() {
-            return possibleMrXLocations;
-        }
-
-        @Nonnull
-        @Override
-        public Map<Integer, Category> getCategoryMap() {
-            return categoryMap;
-        }
-
-        @Override
-        public int getAssumedMrXLocation() {
-            return assumedMrXLocation;
-        }
-
-        @Nonnull
-        @Override
-        public Move applyHeuristic(Heuristic mrXHeuristic, Heuristic detectivesHeuristic) {
-            Move move;
-            if (mrXHeuristic == Heuristic.NONE && detectivesHeuristic == Heuristic.NONE) move = calcRandomMove();
-            else if (turn.isPresent() && turn.get().isMrX()) {
-                long initialTime = System.currentTimeMillis();
-                if (mrXHeuristic == Heuristic.MCD) move = calcMCDHeuristic();
-                else throw new IllegalArgumentException("This heuristic is not valid for MrX");
-                EfficiencyCalculator.calcMCDHeuristicTime += System.currentTimeMillis() - initialTime;
-            } else {
-                long initialTime = System.currentTimeMillis();
-                if (detectivesHeuristic == Heuristic.MTD) move = calcMTDHeuristic();
-                else if (detectivesHeuristic == Heuristic.CAL) move = calcCALHeuristic();
-                else throw new IllegalArgumentException("This heuristic is not valid for Detectives");
-                EfficiencyCalculator.calcMTDORCALHeuristicTime += System.currentTimeMillis() - initialTime;
-            }
-            return move;
-        }
-
         @Nonnull
         @Override
         public AiState advance(Move move) {
             Board.GameState newGameState = state.advance(move);
-            Set<Integer> newDetectiveLocations = Utils.initDetectiveLocations(newGameState);
-            Set<Integer> newMrXLocations;
-            Map<Integer, Category> newCategoryMap;
-            Integer newAssumedMrXLocation;
             if (turn.isPresent() && turn.get().isMrX()) {
-                newMrXLocations = updatePossibleMrXLocations(this.state, newGameState, newDetectiveLocations, possibleMrXLocations);
-                newCategoryMap = updateLocationCategoryMap(newMrXLocations, newDetectiveLocations);
-                newAssumedMrXLocation = selectAssumedMrXLocation(newCategoryMap);
+                Set<Integer> newMrXLocations = updatePossibleMrXLocations(this.state, newGameState, Utils.initDetectiveLocations(newGameState), possibleMrXLocations);
+                Map<Integer, Category> newCategoryMap = createLocationCategoryMap(newMrXLocations, Utils.initDetectiveLocations(newGameState));
+
+                return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, selectAssumedMrXLocation(newCategoryMap));
             } else {
-                newMrXLocations = this.possibleMrXLocations;
-                newCategoryMap = this.categoryMap;
-                newAssumedMrXLocation = this.assumedMrXLocation;
+                return new MyAiStateFactory().build(newGameState, this.possibleMrXLocations, this.categoryMap, this.assumedMrXLocation);
             }
-            return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, newAssumedMrXLocation);
         }
     }
 }

@@ -1,6 +1,5 @@
 package uk.ac.bris.cs.scotlandyard.ui.ai;
 
-import uk.ac.bris.cs.scotlandyard.model.Board;
 import uk.ac.bris.cs.scotlandyard.model.Move;
 
 import java.util.ArrayList;
@@ -68,6 +67,9 @@ public class Tree<T> {
 
         public boolean isLeaf() {
             return children.isEmpty();
+        }
+        public boolean isRoot() {
+            return parent == null;
         }
 
         public void addChild(Move move, AiState state, T value) {

@@ -10,6 +10,7 @@ public class EfficiencyCalculator {
     public static long calcMCDHeuristicTime = 0;
     public static long calcMTDORCALHeuristicTime = 0;
 
+    // TODO Remove efficiency calculator.
     public static List<Integer> getRatio() {
         long sum = initPossibleMrXLocationsTime + initLocationCategoryMapTime + selectAssumedMrXLocationTime + calcMCDHeuristicTime + calcMTDORCALHeuristicTime;
         double scalar = 100.0 / sum;
