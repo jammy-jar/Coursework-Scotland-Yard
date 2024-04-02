@@ -8,18 +8,14 @@ import java.util.*;
 public class Dijkstra {
     public static Map<Integer, Integer> findShortestPath(Board board, int startNode) {
         Map<Integer, Integer> nodeDistanceMap = new HashMap<>();
-
-        // Set starting node distance to 0
         nodeDistanceMap.put(startNode, 0);
 
-        // Priority queue (use a min-heap) based on distance
         PriorityQueue<Integer> pq = new PriorityQueue<>(Comparator.comparingInt(i -> nodeDistanceMap.get(i)));
         pq.add(startNode);
 
         while (!pq.isEmpty()) {
             int current = pq.poll();
 
-            // Explore neighbors
             for (int neighbor : board.getSetup().graph.adjacentNodes(current)) {
                 int distance = nodeDistanceMap.get(current) + 1;
 
@@ -29,10 +25,6 @@ public class Dijkstra {
                 }
             }
         }
-
-        System.out.println(nodeDistanceMap);
-        System.out.println(nodeDistanceMap.size());
-
 
         return nodeDistanceMap;
     }
