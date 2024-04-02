@@ -1,6 +1,6 @@
 package uk.ac.bris.cs.scotlandyard.ui.ai;
 
-public enum Ai {
+public enum AiType {
     MRX,
     DETECTIVES
 }
