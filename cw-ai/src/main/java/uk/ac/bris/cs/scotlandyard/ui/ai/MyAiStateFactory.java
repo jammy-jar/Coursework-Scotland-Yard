@@ -136,14 +136,13 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 // Filter out SingleMoves or DoubleMoves where one or more of the tickets is a secret ticket.
                 List<Move> filteredMoves = new ArrayList<>();
                 for (Move move : moves) {
-                    if (move instanceof Move.SingleMove s && s.ticket != ScotlandYard.Ticket.SECRET) {
+                    if (move instanceof Move.SingleMove s && s.ticket != ScotlandYard.Ticket.SECRET)
                         filteredMoves.add(move);
-                    } else if (move instanceof Move.DoubleMove d
-                            && (d.ticket1 != ScotlandYard.Ticket.SECRET && d.ticket2 != ScotlandYard.Ticket.SECRET)
-                    ) {
+                    else if (move instanceof Move.DoubleMove d
+                            && (d.ticket1 != ScotlandYard.Ticket.SECRET && d.ticket2 != ScotlandYard.Ticket.SECRET))
                         filteredMoves.add(move);
-                    }
                 }
+                if (filteredMoves.isEmpty()) return moves.stream().toList();
                 return filteredMoves;
             } else return moves.stream().toList();
         }
@@ -155,8 +154,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             if (this.state.getAvailableMoves().isEmpty())
                 throw new IllegalArgumentException("There are no available moves for this player!");
 
-            // TODO Add filter
-            // List<Move> filteredMoves = filterMoves(this.state.getAvailableMoves());
+            List<Move> filteredMoves = filterMoves(this.state.getAvailableMoves());
             for (Move move : this.state.getAvailableMoves()) {
                 int distance;
                 if (move instanceof Move.SingleMove s)
@@ -213,9 +211,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
         private Move calcRandomMove() {
             List<Move> moves = state.getAvailableMoves().stream().toList();
-            // TODO Add move filter
-//            if (turn.isPresent() && turn.get().isMrX())
-//                moves = filterMoves(state.getAvailableMoves());
+            if (turn.isPresent() && turn.get().isMrX())
+                moves = filterMoves(state.getAvailableMoves());
 
             int rand = new Random().nextInt(moves.size());
 
