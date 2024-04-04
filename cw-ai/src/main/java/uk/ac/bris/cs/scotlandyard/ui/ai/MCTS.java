@@ -4,35 +4,38 @@ import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.Move;
 import uk.ac.bris.cs.scotlandyard.model.Piece;
 
-import java.util.Comparator;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 public class MCTS {
-    private final static double MRX_EXPLORATION_CONSTANT = 0.2;
-    private final static double DETECTIVE_EXPLORATION_CONSTANT = 2.0;
+    private final static double MRX_EXPLORATION_CONSTANT = 0.5;
+    private final static double DETECTIVE_EXPLORATION_CONSTANT = 0.5;
+    private final static double HISTORY_INFLUENCE_CONSTANT = 5;
     private final static double MRX_EPSILON = 0.1;
     private final static double DETECTIVE_EPSILON = 0.2;
     private final static double COALITION_REDUCTION_CONSTANT = 0.1;
 
     private final AiType ai;
     private final Tree<Double> tree;
+    private final Map<Move, MoveWrapper> moveWrapperMap;
+
 
     public MCTS(AiState state, AiType ai) {
         this.ai = ai;
         this.tree = new Tree<>(null, state, 0.0);
+        this.moveWrapperMap = new HashMap<>();
     }
 
-    private double calcScoreOfNode(Tree<Double>.Node node) {
+    private double calcUctOfNode(Tree<Double>.Node node) {
         double avgNodeValue = node.getValue() / node.getVisits();
         int visitsToParent = node.getParent().getVisits();
+        MoveWrapper moveW = moveWrapperMap.get(node.getMove());
+        double avgMoveScore = moveW == null ? 0 : moveW.getAvgScore();
 
         // TODO Check VISITS TO NODE and not VISITS TO NODE 1.
         if (node.getVisits() == 0) return Double.MAX_VALUE;
         double uct = avgNodeValue + (ai == AiType.MRX ? MRX_EXPLORATION_CONSTANT : DETECTIVE_EXPLORATION_CONSTANT) * Math.sqrt(Math.log(visitsToParent) / node.getVisits());
-        // TODO Implement progressive history later.
-        // double progressiveHistory = HISTORY_INFLUENCE_CONSTANT * (avgScoreOfMove / (node.getVisits() * (1 - avgNodeValue) + 1));
-        return uct;
+        double progressiveHistory = HISTORY_INFLUENCE_CONSTANT * (avgMoveScore / (node.getVisits() * (1 - avgNodeValue) + 1));
+        return uct + progressiveHistory;
     }
 
     public Tree<Double>.Node selection() {
@@ -40,7 +43,7 @@ public class MCTS {
         while (!node.isLeaf()) {
             Tree<Double>.Node maxChild = node.getChildren().get(0);
             for (Tree<Double>.Node child : node.getChildren()) {
-                if (calcScoreOfNode(child) > calcScoreOfNode(maxChild))
+                if (calcUctOfNode(child) > calcUctOfNode(maxChild))
                     maxChild = child;
             }
             node = maxChild;
@@ -60,41 +63,57 @@ public class MCTS {
         return node.getChildren().get(0);
     }
 
-    public double playOut(Tree<Double>.Node node) {
-        Random random = new Random();
-        Optional<Piece> turn = node.getState().getTurn();
-        AiState aiState = node.getState();
-        // Get a double between 0.0 & 1.0.
-        while(aiState.getGameState().getWinner().isEmpty()) {
-            // Implement epsilon for epsilon-greedy playouts.
-            double randNum = random.nextDouble();
-            boolean useHeuristic = randNum > (ai == AiType.MRX ? MRX_EPSILON : DETECTIVE_EPSILON);
-            if (useHeuristic) {
-                // MCD for the MrX, and MTD for the detective is the best heuristic when the Ai is MrX
-                if (ai == AiType.MRX) aiState = aiState.advance(aiState.applyHeuristic(Heuristic.MCD, Heuristic.MTD));
-                    // MCD for the MrX, and CAL for the detective is the best heuristic when the Ai is Detectives.
-                else if (ai == AiType.DETECTIVES) aiState = aiState.advance(aiState.applyHeuristic(Heuristic.MCD, Heuristic.CAL));
-            } else {
-                aiState = aiState.advance(aiState.applyHeuristic(Heuristic.NONE, Heuristic.NONE));
-            }
-        }
-
-        // If the AIs MrX and the winner is MrX the game score is 1, and 0 if MrX isn't the winner vice-versa
-        double gameScore;
+    // If the AIs MrX and the winner is MrX the game score is 1, and 0 if MrX isn't the winner vice-versa
+    private double calcGameScore(AiState aiState, Optional<Piece> turn) {
+        double gameScore = 0;
         ImmutableSet<Piece> winner = aiState.getGameState().getWinner();
         if (winner.contains(Piece.MrX.MRX)) {
             if (ai == AiType.MRX) gameScore = 1;
-            else gameScore = -1;
         } else {
             // Apply coalition reduction
             if (ai == AiType.DETECTIVES) {
                 if (turn != aiState.getTurn()) gameScore = 1 - COALITION_REDUCTION_CONSTANT;
                 else gameScore = 1;
-            } else {
-                gameScore = -1;
             }
         }
         return gameScore;
+    }
+
+    public double playOut(Tree<Double>.Node node) {
+        Random random = new Random();
+        Optional<Piece> turn = node.getState().getTurn();
+        Set<Move> movesMade = new HashSet<>();
+        AiState aiState = node.getState();
+        // Get a double between 0.0 & 1.0.
+        while(aiState.getGameState().getWinner().isEmpty()) {
+            // Implement epsilon for epsilon-greedy play-outs.
+            double randNum = random.nextDouble();
+            boolean useHeuristic = randNum > (ai == AiType.MRX ? MRX_EPSILON : DETECTIVE_EPSILON);
+            if (useHeuristic) {
+                // MCD for the MrX, and MTD for the detective is the best heuristic when the Ai is MrX
+                if (ai == AiType.MRX) {
+                    Move move = aiState.applyHeuristic(Heuristic.MCD, Heuristic.MTD);
+                    movesMade.add(move);
+                    aiState = aiState.advance(move);
+                } else if (ai == AiType.DETECTIVES) {
+                    // MCD for the MrX, and CAL for the detective is the best heuristic when the Ai is Detectives.
+                    Move move = aiState.applyHeuristic(Heuristic.MCD, Heuristic.CAL);
+                    movesMade.add(move);
+                    aiState = aiState.advance(move);
+                }
+            } else {
+                Move move = aiState.applyHeuristic(Heuristic.NONE, Heuristic.NONE);
+                movesMade.add(move);
+                aiState = aiState.advance(move);
+            }
+        }
+
+        double score = calcGameScore(aiState, turn);
+        for (Move move : movesMade) {
+            MoveWrapper moveW = moveWrapperMap.computeIfAbsent(move, m -> new MoveWrapper(m));
+            moveW.add(score);
+        }
+        return score;
     }
 
     public void backPropagation(Tree<Double>.Node node, double gameScore) {
