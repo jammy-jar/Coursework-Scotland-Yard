@@ -46,27 +46,17 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             return map;
         }
 
-        private Map<Integer, Double> calcLocationProbabilities(Map<Integer, Category> categoryMap) {
-            HashMap<Integer, Double> probabilities = new HashMap<>();
+        private Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
             Optional<Double> weightSum = categoryMap.values().stream().map(c -> c.getWeight()).reduce((s, w) -> s + w);
             if (weightSum.isEmpty())
                 throw new IllegalArgumentException("The category map is empty!");
-            int prevLocation = -1;
-            for (int location : categoryMap.keySet()) {
-                double prevProb = probabilities.isEmpty() ? 0 : probabilities.get(prevLocation);
-                probabilities.put(location, prevProb + categoryMap.get(location).getWeight() / weightSum.get());
-                prevLocation = location;
-            }
-            return probabilities;
-        }
 
-        private Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
-            Map<Integer, Double> locationProbabilities = calcLocationProbabilities(categoryMap);
-            double rand = new Random().nextDouble();
+            double rand = new Random().nextDouble(weightSum.get());
 
             int catchC = -1;
             for (int location : categoryMap.keySet()) {
-                if (locationProbabilities.get(location) >= rand)
+                rand -= categoryMap.get(location).getWeight();
+                if (rand < 0)
                     return location;
                 catchC = location;
             }
@@ -155,12 +145,13 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 throw new IllegalArgumentException("There are no available moves for this player!");
 
             List<Move> filteredMoves = filterMoves(this.state.getAvailableMoves());
-            for (Move move : this.state.getAvailableMoves()) {
+            for (Move move : filteredMoves) {
                 int distance;
                 if (move instanceof Move.SingleMove s)
                     distance = MyAi.LOOKUP.getMinDistance(s.destination, detectiveLocations);
-                else
-                    distance = MyAi.LOOKUP.getMinDistance(((Move.DoubleMove) move).destination2, detectiveLocations);
+                else if (move instanceof Move.DoubleMove d)
+                    distance = MyAi.LOOKUP.getMinDistance(d.destination2, detectiveLocations);
+                else throw new RuntimeException("This move type is not valid!");
                 if (distance >= maximum) {
                     maximum = distance;
                     maxMove = move;
@@ -179,8 +170,9 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             for (Move move : state.getAvailableMoves()) {
                 int total = 0;
                 for (Integer mrXLoc : possibleMrXLocations) {
-                    // Assume detectives turn so only single moves.
-                    total += MyAi.LOOKUP.getDistance(mrXLoc, ((Move.SingleMove) move).destination);
+                    if (!(move instanceof Move.SingleMove singleMove))
+                        throw new RuntimeException("Detectives can only make single moves!");
+                    total += MyAi.LOOKUP.getDistance(mrXLoc, singleMove.destination);
                 }
                 if (total <= minimum) {
                     minimum = total;
@@ -198,8 +190,9 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             if (state.getAvailableMoves().isEmpty())
                 throw new IllegalArgumentException("There are no available moves for this player!");
             for (Move move : state.getAvailableMoves()) {
-                // Assume detectives turn so only single moves.
-                int distance = MyAi.LOOKUP.getDistance(assumedMrXLocation, ((Move.SingleMove) move).destination);
+                if (!(move instanceof Move.SingleMove singleMove))
+                    throw new RuntimeException("Detectives can only make single moves!");
+                int distance = MyAi.LOOKUP.getDistance(assumedMrXLocation, singleMove.destination);
                 if (distance <= minimum) {
                     minimum = distance;
                     minMove = move;
@@ -322,10 +315,17 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         public AiState advance(Move move) {
             Board.GameState newGameState = state.advance(move);
             if (turn.isPresent() && turn.get().isMrX()) {
+                long initialTime = System.currentTimeMillis();
                 Set<Integer> newMrXLocations = updatePossibleMrXLocations(this.state, newGameState, Utils.initDetectiveLocations(newGameState), possibleMrXLocations);
+                EfficiencyCalculator.initPossibleMrXLocationsTime += System.currentTimeMillis() - initialTime;
+                initialTime = System.currentTimeMillis();
                 Map<Integer, Category> newCategoryMap = createLocationCategoryMap(newMrXLocations, Utils.initDetectiveLocations(newGameState));
+                EfficiencyCalculator.initLocationCategoryMapTime += System.currentTimeMillis() - initialTime;
+                initialTime = System.currentTimeMillis();
+                int newAssumedLocation = selectAssumedMrXLocation(newCategoryMap);
+                EfficiencyCalculator.selectAssumedMrXLocationTime += System.currentTimeMillis() - initialTime;
 
-                return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, selectAssumedMrXLocation(newCategoryMap));
+                return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, newAssumedLocation);
             } else {
                 return new MyAiStateFactory().build(newGameState, this.possibleMrXLocations, this.categoryMap, this.assumedMrXLocation);
             }

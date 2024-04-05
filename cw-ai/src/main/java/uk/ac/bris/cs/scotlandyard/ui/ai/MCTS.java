@@ -32,7 +32,7 @@ public class MCTS {
         double avgMoveScore = moveW == null ? 0 : moveW.getAvgScore();
 
         // TODO Check VISITS TO NODE and not VISITS TO NODE 1.
-        if (node.getVisits() == 0) return Double.MAX_VALUE;
+        if (node.getVisits() == 0) return Double.POSITIVE_INFINITY;
         double uct = avgNodeValue + (ai == AiType.MRX ? MRX_EXPLORATION_CONSTANT : DETECTIVE_EXPLORATION_CONSTANT) * Math.sqrt(Math.log(visitsToParent) / node.getVisits());
         double progressiveHistory = HISTORY_INFLUENCE_CONSTANT * (avgMoveScore / (node.getVisits() * (1 - avgNodeValue) + 1));
         return uct + progressiveHistory;
@@ -128,15 +128,17 @@ public class MCTS {
     }
 
     public Optional<Tree<Double>.Node> run() {
+        long initTime = System.currentTimeMillis();
         for (int i = 0; i < 2500; i++) {
-            System.out.println("LOOP " + i);
-            System.out.println(EfficiencyCalculator.getRatio());
+            // System.out.println("LOOP " + i);
+            // System.out.println(EfficiencyCalculator.getRatio());
             Tree<Double>.Node selectNode = selection();
             Tree<Double>.Node expandNode = expansion(selectNode);
             double gameScore = playOut(expandNode);
             backPropagation(expandNode, gameScore);
         }
-        if (tree.getRoot().getChildren().isEmpty()) throw new IllegalArgumentException("There are available moves!");
+        System.out.println("Took " + (System.currentTimeMillis() - initTime) / 1000 + " seconds to run.");
+        if (tree.getRoot().getChildren().isEmpty()) throw new IllegalArgumentException("There are no available moves!");
         return tree.getRoot().getChildren().stream().max(Comparator.comparingInt(n -> n.getVisits()));
     }
 }

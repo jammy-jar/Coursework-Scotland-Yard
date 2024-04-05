@@ -27,8 +27,8 @@ public class MyAi implements Ai {
 			LOOKUP = new LocationDistanceLookup(board);
 
 		Optional<Piece> currentPlayer;
-		Optional<Move> anyMove = board.getAvailableMoves().stream().findFirst();
-		if (anyMove.isPresent()) currentPlayer = Optional.of(anyMove.get().commencedBy());
+		Optional<Move> someMove = board.getAvailableMoves().stream().findFirst();
+		if (someMove.isPresent()) currentPlayer = Optional.of(someMove.get().commencedBy());
 		else currentPlayer = Optional.empty();
 
 		AiType ai;
