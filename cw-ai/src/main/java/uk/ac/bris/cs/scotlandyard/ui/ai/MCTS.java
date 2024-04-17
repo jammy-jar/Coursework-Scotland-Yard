@@ -54,11 +54,11 @@ public class MCTS {
         if (state.getMoves().isEmpty()) {
 //            // TODO Idk fix this
 //            if (state.getTurn().isMrX())
-//                throw new IllegalArgumentException("MrX can't move!");
+//                throw new NoSuchElementException("MrX can't move!");
 //
 //            node.addChild(null, state, 0.0);
 
-            throw new IllegalArgumentException("No moves can be made!");
+            throw new NoSuchElementException("No moves can be made!");
         }
         for (Move move : state.getMoves())
             node.addChild(move, state.advance(move), 0.0);
@@ -156,7 +156,7 @@ public class MCTS {
         System.out.println(EfficiencyCalculator.getRatio());
         System.out.println("Completed: " + i + " loops.");
         executorService.shutdown();
-        if (tree.getRoot().getChildren().isEmpty()) throw new IllegalArgumentException("There are no available moves!");
+        if (tree.getRoot().getChildren().isEmpty()) throw new NoSuchElementException("There are no available moves!");
         for (Tree<Double>.Node child : tree.getRoot().getChildren()) {
             if (child.getMove() instanceof Move.SingleMove s)
                 System.out.println("Move: " + s.destination + " has score: " + child.getValue());

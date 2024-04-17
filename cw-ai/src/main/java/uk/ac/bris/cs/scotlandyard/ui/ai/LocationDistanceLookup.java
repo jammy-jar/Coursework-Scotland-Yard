@@ -29,7 +29,7 @@ public class LocationDistanceLookup {
 
     public int getMinDistance(int source, Set<Integer> destinations) {
         OptionalInt distance = destinations.stream().mapToInt(l -> MyAi.LOOKUP.getDistance(source, l)).min();
-        if (distance.isEmpty()) throw new IllegalArgumentException("Destination locations is empty!");
+        if (distance.isEmpty()) throw new NoSuchElementException("Destination locations is empty!");
         return distance.getAsInt();
     }
 }

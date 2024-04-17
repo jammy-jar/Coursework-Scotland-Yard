@@ -64,7 +64,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     if (latestLog.location().isPresent())
                         return new HashSet<>(Set.of(latestLog.location().get()));
                     else
-                        throw new IllegalArgumentException("The Log Entry of the last move is not present!");
+                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
                 } else {
                     Set<Integer> locations = new HashSet<>();
                     for (Integer location : prevMrXLocations)
@@ -79,7 +79,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     if (secondMostLatestLog.location().isPresent())
                         firstLocations.add(secondMostLatestLog.location().get());
                     else
-                        throw new IllegalArgumentException("The Log Entry of the last move is not present!");
+                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
                 } else {
                     for (Integer location : prevMrXLocations)
                         firstLocations.addAll(calcMrXReachableLocations(newState, detectiveLocations, location, secondMostLatestLog.ticket()));
@@ -89,7 +89,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                     if (latestLog.location().isPresent())
                         return new HashSet<>(Set.of(latestLog.location().get()));
                     else
-                        throw new IllegalArgumentException("The Log Entry of the last move is not present!");
+                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
                 } else {
                     Set<Integer> locations = new HashSet<>();
                     for (int location : firstLocations)
@@ -111,7 +111,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
             Optional<Double> weightSum = categoryMap.values().stream().map(c -> c.getWeight()).reduce((s, w) -> s + w);
             if (weightSum.isEmpty())
-                throw new IllegalArgumentException("The category map is empty!");
+                throw new NoSuchElementException("The category map is empty!");
 
             double rand = new Random().nextDouble(weightSum.get());
 
@@ -123,7 +123,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 catchC = location;
             }
             if (catchC < 0)
-                throw new IllegalArgumentException("The category map is empty!");
+                throw new NoSuchElementException("The category map is empty!");
             return catchC;
         }
 
@@ -175,8 +175,6 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             } else {
                 if (availableMoves.stream().anyMatch(m -> m.commencedBy().isMrX()))
                     throw new IllegalArgumentException("Detectives can't make this move!");
-
-                // TODO Filter Detective moves.
                 return availableMoves.stream().filter(m -> m.commencedBy() == turn).toList();
             }
         }
@@ -195,7 +193,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 // Sorts, so that the order is determined. Sort by enum, eg. Piece.Detective.BLUE declared before Piece.Detective.RED, so blue will be picked first.
                 Optional<Piece> turn = state.getAvailableMoves().stream().map(m -> m.commencedBy()).sorted().findFirst();
                 if (turn.isEmpty())
-                    throw new IllegalArgumentException("There are no remaining players!");
+                    throw new NoSuchElementException("There are no remaining players!");
                 this.turn = turn.get();
                 this.moves = filterMoves(state.getAvailableMoves());
             } else {
@@ -214,7 +212,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 // Sorts, so that the order is determined. Sort by enum, eg. Piece.Detective.BLUE declared before Piece.Detective.RED, so blue will be picked first.
                 Optional<Piece> turn = state.getAvailableMoves().stream().map(m -> m.commencedBy()).sorted().findFirst();
                 if (turn.isEmpty())
-                    throw new IllegalArgumentException("There are no remaining players!");
+                    throw new NoSuchElementException("There are no remaining players!");
                 this.turn = turn.get();
                 this.moves = filterMoves(state.getAvailableMoves());
                 this.categoryMap = createLocationCategoryMap(this.possibleMrXLocations, this.detectiveLocations);
@@ -232,7 +230,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             int maximum = 0;
             Move maxMove = null;
             if (moves.isEmpty())
-                throw new IllegalArgumentException("There are no available moves for this player!");
+                throw new NoSuchElementException("There are no available moves for this player!");
 
             for (Move move : moves) {
                 int distance;
@@ -255,7 +253,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             int minimum = Integer.MAX_VALUE;
             Move minMove = null;
             if (moves.isEmpty())
-                throw new IllegalArgumentException("There are no available moves for this player!");
+                throw new NoSuchElementException("There are no available moves for this player!");
             for (Move move : moves) {
                 int total = 0;
                 for (Integer mrXLoc : possibleMrXLocations) {
@@ -277,7 +275,7 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             int minimum = Integer.MAX_VALUE;
             Move minMove = null;
             if (moves.isEmpty())
-                throw new IllegalArgumentException("There are no available moves for this player!");
+                throw new NoSuchElementException("There are no available moves for this player!");
             for (Move move : moves) {
                 if (!(move instanceof Move.SingleMove singleMove))
                     throw new RuntimeException("Detectives can only make single moves!");

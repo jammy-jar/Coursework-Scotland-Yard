@@ -7,10 +7,7 @@ import uk.ac.bris.cs.scotlandyard.model.Move;
 import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +46,7 @@ public class MyAi implements Ai {
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
-        if (node.isEmpty()) throw new IllegalArgumentException("A best move could not be found!");
+        if (node.isEmpty()) throw new NoSuchElementException("A best move could not be found!");
 		previousAiState = node.get().getState();
 		return node.get().getMove();
 	}
