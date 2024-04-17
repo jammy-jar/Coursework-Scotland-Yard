@@ -227,6 +227,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private Move calcMCDHeuristic() {
             int maximum = 0;
             Move maxMove = null;
+            if (moves == null)
+                throw new NullPointerException("Moves is null!");
             if (moves.isEmpty())
                 throw new NoSuchElementException("There are no available moves for this player!");
 
@@ -250,6 +252,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private Move calcMTDHeuristic() {
             int minimum = Integer.MAX_VALUE;
             Move minMove = null;
+            if (moves == null)
+                throw new NullPointerException("Moves is null!");
             if (moves.isEmpty())
                 throw new NoSuchElementException("There are no available moves for this player!");
             for (Move move : moves) {
@@ -272,6 +276,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         private Move calcCALHeuristic() {
             int minimum = Integer.MAX_VALUE;
             Move minMove = null;
+            if (moves == null)
+                throw new NullPointerException("Moves is null!");
             if (moves.isEmpty())
                 throw new NoSuchElementException("There are no available moves for this player!");
             for (Move move : moves) {
@@ -288,6 +294,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         }
 
         private Move calcRandomMove() {
+            if (moves == null)
+                throw new NullPointerException("Moves is null!");
             int rand = new Random().nextInt(moves.size());
             return moves.get(rand);
         }
@@ -321,6 +329,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         @Override
         public Move applyHeuristic(Heuristic mrXHeuristic, Heuristic detectivesHeuristic) {
             Move move;
+            if (turn == null)
+                throw new NullPointerException("Turn is null!");
             if (mrXHeuristic == Heuristic.NONE && detectivesHeuristic == Heuristic.NONE) return calcRandomMove();
             else if (turn.isMrX()) {
                 long initialTime = System.currentTimeMillis();
@@ -341,6 +351,8 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         @Override
         public AiState advance(Move move) {
             Board.GameState newGameState = state.advance(move);
+            if (turn == null)
+                throw new NullPointerException("Turn is null!");
             if (turn.isMrX()) {
                 long initialTime = System.currentTimeMillis();
                 Set<Integer> newDetectiveLocations = Utils.initDetectiveLocations(newGameState);
@@ -358,7 +370,6 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
                 return new MyAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, newAssumedLocation);
             } else {
-                //  TODO Turn is not correctly synced.
                 return new MyAiStateFactory().build(newGameState, this.possibleMrXLocations, this.categoryMap, this.assumedMrXLocation);
             }
         }
