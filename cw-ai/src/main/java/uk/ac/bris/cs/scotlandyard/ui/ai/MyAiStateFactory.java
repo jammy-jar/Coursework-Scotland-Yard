@@ -182,8 +182,6 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         public MyAiState(Board.GameState state, Set<Integer> mrXLocations, Map<Integer, Category> locationCategorisationMap, int assumedMrXLocation) {
             this.state = state;
             this.detectiveLocations = Utils.initDetectiveLocations(state);
-
-            // TODO Make all illegal argument exception correct exception.
             this.possibleMrXLocations = mrXLocations;
             this.categoryMap = locationCategorisationMap;
             this.assumedMrXLocation = assumedMrXLocation;
@@ -308,9 +306,9 @@ public class MyAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
         @Nonnull
         @Override
-        public Piece getTurn() {
-            // TODO Make return optional as can be null if there exists a winner.
-            return turn;
+        public Optional<Piece> getTurn() {
+            if (turn != null) return Optional.of(turn);
+            else return Optional.empty();
         }
 
         @Nonnull

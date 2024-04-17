@@ -66,7 +66,7 @@ public class MCTS {
     }
 
     // If the AIs MrX and the winner is MrX the game score is 1, and 0 if MrX isn't the winner vice-versa
-    private double calcGameScore(AiState aiState, Piece turn) {
+    private double calcGameScore(AiState aiState, Optional<Piece> turn) {
         double gameScore = 0;
         ImmutableSet<Piece> winner = aiState.getGameState().getWinner();
         if (winner.contains(Piece.MrX.MRX)) {
@@ -74,7 +74,8 @@ public class MCTS {
         } else {
             // Apply coalition reduction
             if (ai == AiType.DETECTIVES) {
-                if (turn != aiState.getTurn()) gameScore = 1 - ScotLandYardAi.COALITION_REDUCTION_CONSTANT;
+                // TODO Check equals works.
+                if (!turn.equals(aiState.getTurn())) gameScore = 1 - ScotLandYardAi.COALITION_REDUCTION_CONSTANT;
                 else gameScore = 1;
             }
         }
@@ -83,7 +84,7 @@ public class MCTS {
 
     public Double playOut(Tree<Double>.Node node) {
         Random random = new Random();
-        Piece turn = node.getState().getTurn();
+        Optional<Piece> turn = node.getState().getTurn();
         Set<Move> movesMade = new HashSet<>();
         AiState aiState = node.getState();
         // Get a double between 0.0 & 1.0.
