@@ -5,6 +5,7 @@ import uk.ac.bris.cs.scotlandyard.model.Move;
 import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -13,7 +14,10 @@ public interface AiState {
     Board.GameState getGameState();
     @Nonnull
     Set<Integer> getPossibleMrXLocations();
-    Optional<Piece> getTurn();
+    @Nonnull
+    Piece getTurn();
+    @Nonnull
+    List<Move> getMoves();
 
 
     @Nonnull

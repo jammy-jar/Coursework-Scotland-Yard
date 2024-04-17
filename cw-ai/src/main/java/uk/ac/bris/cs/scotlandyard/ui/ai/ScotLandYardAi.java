@@ -3,10 +3,23 @@ package uk.ac.bris.cs.scotlandyard.ui.ai;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.Board;
+import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 
 public class ScotLandYardAi {
+    // Constants for MCTS.
+    public final static double MRX_EXPLORATION_CONSTANT = 0.5;
+    public final static double DETECTIVE_EXPLORATION_CONSTANT = 0.5;
+    public final static double HISTORY_INFLUENCE_CONSTANT = 5;
+    public final static double MRX_EPSILON = 0.1;
+    public final static double DETECTIVE_EPSILON = 0.2;
+    public final static double COALITION_REDUCTION_CONSTANT = 0.5;
+
+    public final static int THREAD_COUNT = 8;
+
+
     public static final ImmutableSet<Integer> MRX_START_LOCATIONS =
             ImmutableSet.of(35, 45, 51, 71, 78, 104, 106, 127, 132, 166, 170, 172);
     // All locations that can be reached directly from the start locations.
