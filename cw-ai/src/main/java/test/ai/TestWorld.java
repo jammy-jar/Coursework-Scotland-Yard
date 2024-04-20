@@ -29,11 +29,9 @@ public class TestWorld {
         return new GameSetup(defaultGraph, STANDARD24MOVES);
     }
 
-//    public static void main(String[] args) {
-//        setUp();
-//
-//        DetectiveAiTest detectiveAiTest = new DetectiveAiTest();
-//        detectiveAiTest.testCalcDistanceToNearestDetective();
-//        detectiveAiTest.testSelectAssumedMrXLocation();
-//    }
+    public static void main(String[] args) {
+        setUp();
+
+        MCTSTest.testMCTS();
+    }
 }
