@@ -7,6 +7,7 @@ import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import javax.annotation.Nonnull;
 import java.util.List;
+import java.util.Set;
 
 public class ScotLandYardAi {
     // Constants for MCTS.
@@ -17,7 +18,8 @@ public class ScotLandYardAi {
     public final static double DETECTIVE_EPSILON = 0.2;
     public final static double COALITION_REDUCTION_CONSTANT = 0.5;
 
-    public final static int THREAD_COUNT = 8;
+    public final static double ITERATIONS = 1000;
+
 
 
     public static final ImmutableSet<Integer> MRX_START_LOCATIONS =
@@ -30,6 +32,8 @@ public class ScotLandYardAi {
 
     public interface Factory<T> {
         @Nonnull
-        T build(Board.GameState state, AiType ai);
+        T build(Board.GameState state);
+        @Nonnull
+        T build(Board.GameState state, Set<Integer> possibleMrXLocations);
     }
 }

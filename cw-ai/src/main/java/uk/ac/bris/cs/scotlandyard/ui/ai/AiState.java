@@ -21,7 +21,7 @@ public interface AiState {
 
 
     @Nonnull
-    Move applyHeuristic(Heuristic mrXHeuristic, Heuristic detectivesHeuristic);
+    Move applyHeuristic(Heuristic heuristic);
     @Nonnull
     AiState advance(Move move);
 }

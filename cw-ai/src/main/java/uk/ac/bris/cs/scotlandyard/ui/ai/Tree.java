@@ -5,11 +5,11 @@ import uk.ac.bris.cs.scotlandyard.model.Move;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Tree<T> {
+public class Tree<E, S, T> {
     private final Node root;
 
-    public Tree(Move move, AiState state, T rootValue) {
-        this.root = new Node(null, move, state, rootValue);
+    public Tree(E edge, S state, T rootValue) {
+        this.root = new Node(null, edge, state, rootValue);
     }
 
     public Node getRoot() {
@@ -18,14 +18,14 @@ public class Tree<T> {
 
     public class Node {
         private int visits;
-        private final Move move;
-        private final AiState state;
+        private final E edge;
+        private final S state;
         private T value;
         private final Node parent;
         private final List<Node> children;
 
-        public Node(Node parent, Move move, AiState state, T value) {
-            this.move = move;
+        public Node(Node parent, E edge, S state, T value) {
+            this.edge = edge;
             this.state = state;
             this.visits = 0;
             this.value = value;
@@ -37,11 +37,11 @@ public class Tree<T> {
             return this.visits;
         }
 
-        public Move getMove() {
-            return this.move;
+        public E getEdgeValue() {
+            return this.edge;
         }
 
-        public AiState getState() {
+        public S getState() {
             return this.state;
         }
 
@@ -72,8 +72,8 @@ public class Tree<T> {
             return parent == null;
         }
 
-        public void addChild(Move move, AiState state, T value) {
-            this.children.add(new Node(this, move, state, value));
+        public void addChild(E edge, S state, T value) {
+            this.children.add(new Node(this, edge, state, value));
         }
     }
 

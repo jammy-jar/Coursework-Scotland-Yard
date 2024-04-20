@@ -8,9 +8,6 @@ import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import javax.annotation.Nonnull;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -40,25 +37,31 @@ public class MyAi implements Ai {
 		else
 			ai = AiType.DETECTIVES;
 
-		Optional<Tree<Double>.Node> node;
-        try {
-            node = playMCTS(board, ai);
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+		MCTS mcts = initMCTS(board, ai);
+		for (int i = 0; i < ScotLandYardAi.ITERATIONS; i++)
+			mcts.next();
+		mcts.printInfo();
+		Optional<Tree<Move, AiState, Double>.Node> node = mcts.getOptimalNode();
+
         if (node.isEmpty()) throw new NoSuchElementException("A best move could not be found!");
 		previousAiState = node.get().getState();
-		return node.get().getMove();
+		return node.get().getEdgeValue();
 	}
 
-	private Optional<Tree<Double>.Node> playMCTS(Board board, AiType ai) throws InterruptedException, ExecutionException {
+	private MCTS initMCTS(Board board, AiType ai) {
 		if (!(board instanceof Board.GameState state))
 			throw new IllegalArgumentException("The AI does not support this type of board!");
 		if (previousAiState == null) {
-			return new MCTS(new MyAiStateFactory().build(state, ai), ai).run();
+			if (ai == AiType.MRX)
+				return new MCTS(new MrXAiStateFactory().build(state), ai);
+			else
+				return new MCTS(new DetectiveAiStateFactory().build(state), ai);
 		} else {
 			Set<Integer> mrXRemoveDetectiveLocations = previousAiState.getPossibleMrXLocations().stream().filter(l -> !Utils.initDetectiveLocations(state).contains(l)).collect(Collectors.toSet());
-			return new MCTS(new MyAiStateFactory().build(state, mrXRemoveDetectiveLocations), ai).run();
+			if (ai == AiType.MRX)
+				return new MCTS(new MrXAiStateFactory().build(state, mrXRemoveDetectiveLocations), ai);
+			else
+				return new MCTS(new DetectiveAiStateFactory().build(state, mrXRemoveDetectiveLocations), ai);
 		}
 	}
 }

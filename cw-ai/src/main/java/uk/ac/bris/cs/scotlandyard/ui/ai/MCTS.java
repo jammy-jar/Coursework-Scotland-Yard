@@ -9,21 +9,26 @@ import java.util.concurrent.*;
 
 public class MCTS {
     private final AiType ai;
-    private final Tree<Double> tree;
+    protected final Tree<Move, AiState, Double> tree;
     private final Map<Move, MoveWrapper> moveWrapperMap;
-    private final ExecutorService executorService;
+    protected Tree<Move, AiState, Double>.Node selectNode;
+    protected Tree<Move, AiState, Double>.Node expandNode;
+    protected double playOutScore;
+
 
     public MCTS(AiState state, AiType ai) {
         this.ai = ai;
         this.tree = new Tree<>(null, state, 0.0);
+        this.selectNode = this.tree.getRoot();
+        this.expandNode = this.tree.getRoot();
+        this.playOutScore = 0;
         this.moveWrapperMap = new HashMap<>();
-        this.executorService = Executors.newFixedThreadPool(ScotLandYardAi.THREAD_COUNT);
     }
 
-    private double calcUctOfNode(Tree<Double>.Node node) {
+    private double calcUctOfNode(Tree<Move, AiState, Double>.Node node) {
         double avgNodeValue = node.getValue() / node.getVisits();
         int visitsToParent = node.getParent().getVisits();
-        MoveWrapper moveW = moveWrapperMap.get(node.getMove());
+        MoveWrapper moveW = moveWrapperMap.get(node.getEdgeValue());
         double avgMoveScore = moveW == null ? 0 : moveW.getAvgScore();
 
         // TODO Check VISITS TO NODE and not VISITS TO NODE 1.
@@ -33,11 +38,11 @@ public class MCTS {
         return uct + progressiveHistory;
     }
 
-    public Tree<Double>.Node selection() {
-        Tree<Double>.Node node = tree.getRoot();
+    protected Tree<Move, AiState, Double>.Node selection() {
+        Tree<Move, AiState, Double>.Node node = tree.getRoot();
         while (!node.isLeaf()) {
-            Tree<Double>.Node maxChild = node.getChildren().get(0);
-            for (Tree<Double>.Node child : node.getChildren()) {
+            Tree<Move, AiState, Double>.Node maxChild = node.getChildren().get(0);
+            for (Tree<Move, AiState, Double>.Node child : node.getChildren()) {
                 if (calcUctOfNode(child) > calcUctOfNode(maxChild))
                     maxChild = child;
             }
@@ -46,26 +51,18 @@ public class MCTS {
         return node;
     }
 
-    public Tree<Double>.Node expansion(Tree<Double>.Node node) {
-        if (node.getVisits() < 10) return node;
+    protected Tree<Move, AiState, Double>.Node expansion() {
+        if (selectNode.getVisits() < 1) return selectNode;
 
-        AiState state = node.getState();
-        // If no available moves don't make a move.
-        if (state.getMoves().isEmpty()) {
-//            // TODO Idk fix this
-//            if (state.getTurn().isMrX())
-//                throw new NoSuchElementException("MrX can't move!");
-//
-//            node.addChild(null, state, 0.0);
-
+        AiState state = selectNode.getState();
+        if (state.getMoves().isEmpty())
             throw new NoSuchElementException("No moves can be made!");
-        }
         for (Move move : state.getMoves())
-            node.addChild(move, state.advance(move), 0.0);
-        return node;
+            selectNode.addChild(move, state.advance(move), 0.0);
+        return selectNode.getChildren().get(0);
     }
 
-    // If the AIs MrX and the winner is MrX the game score is 1, and 0 if MrX isn't the winner vice-versa
+    // If the AI is MrX and the winner is MrX the game score is 1, and 0 if MrX isn't the winner vice-versa
     private double calcGameScore(AiState aiState, Optional<Piece> turn) {
         double gameScore = 0;
         ImmutableSet<Piece> winner = aiState.getGameState().getWinner();
@@ -74,7 +71,6 @@ public class MCTS {
         } else {
             // Apply coalition reduction
             if (ai == AiType.DETECTIVES) {
-                // TODO Check equals works.
                 if (!turn.equals(aiState.getTurn())) gameScore = 1 - ScotLandYardAi.COALITION_REDUCTION_CONSTANT;
                 else gameScore = 1;
             }
@@ -82,36 +78,40 @@ public class MCTS {
         return gameScore;
     }
 
-    public Double playOut(Tree<Double>.Node node) {
+    protected Double playOut() {
+        if (expandNode.getEdgeValue() != null)
+            System.out.println("Nodes move is commenced by: " + expandNode.getEdgeValue().commencedBy());
         Random random = new Random();
-        Optional<Piece> turn = node.getState().getTurn();
-        Set<Move> movesMade = new HashSet<>();
-        AiState aiState = node.getState();
+        Optional<Piece> turn = expandNode.getState().getTurn();
+        // TODO Make list a set
+        List<Move> movesMade = new ArrayList<>();
+        AiState aiState = expandNode.getState();
         // Get a double between 0.0 & 1.0.
         while(aiState.getGameState().getWinner().isEmpty()) {
             // Implement epsilon for epsilon-greedy play-outs.
             double randNum = random.nextDouble();
             boolean useHeuristic = randNum > (ai == AiType.MRX ? ScotLandYardAi.MRX_EPSILON : ScotLandYardAi.DETECTIVE_EPSILON);
             if (useHeuristic) {
-                // MCD for the MrX, and MTD for the detective is the best heuristic when the Ai is MrX
-                if (ai == AiType.MRX) {
-                    Move move = aiState.applyHeuristic(Heuristic.MCD, Heuristic.MTD);
-                    movesMade.add(move);
-                    aiState = aiState.advance(move);
-                } else if (ai == AiType.DETECTIVES) {
-                    // MCD for the MrX, and CAL for the detective is the best heuristic when the Ai is Detectives.
-                    Move move = aiState.applyHeuristic(Heuristic.MCD, Heuristic.CAL);
-                    movesMade.add(move);
-                    aiState = aiState.advance(move);
-                }
+                Heuristic heuristic = switch (ai) {
+                    // When the Ai is MrX the best heuristics: MCD & MTD.
+                    case MRX -> aiState.getTurn().isPresent() && aiState.getTurn().get().isMrX() ? Heuristic.MCD : Heuristic.MTD;
+                    // When the Ai is Detectives the best heuristics: MCD & CAL.
+                    case DETECTIVES -> aiState.getTurn().isPresent() && aiState.getTurn().get().isMrX() ? Heuristic.MCD : Heuristic.CAL;
+                };
+                Move move = aiState.applyHeuristic(heuristic);
+                movesMade.add(move);
+                aiState = aiState.advance(move);
             } else {
-                Move move = aiState.applyHeuristic(Heuristic.NONE, Heuristic.NONE);
+                // Heuristic is null for '< epsilon' due to application of epsilon greedy play-outs.
+                Move move = aiState.applyHeuristic(Heuristic.NONE);
                 movesMade.add(move);
                 aiState = aiState.advance(move);
             }
         }
 
         double score = calcGameScore(aiState, turn);
+        System.out.println("Moves made: " + movesMade.stream().filter(m -> m instanceof Move.SingleMove).map(m -> m.commencedBy()).toList());
+        System.out.println("Moves made: " + movesMade.stream().filter(m -> m instanceof Move.SingleMove).map(m -> ((Move.SingleMove) m).destination).toList());
         for (Move move : movesMade) {
             MoveWrapper moveW = moveWrapperMap.computeIfAbsent(move, m -> new MoveWrapper(m));
             moveW.add(score);
@@ -119,51 +119,42 @@ public class MCTS {
         return score;
     }
 
-    public void backPropagation(Tree<Double>.Node node, double gameScore) {
-        Tree<Double>.Node currentNode = node;
+    protected void backPropagation() {
+        Tree<Move, AiState, Double>.Node currentNode = expandNode;
         currentNode.incrementVisits();
-        currentNode.setValue(currentNode.getValue() + gameScore);
+        currentNode.setValue(currentNode.getValue() + playOutScore);
         while (!currentNode.isRoot()) {
             currentNode = currentNode.getParent();
             currentNode.incrementVisits();
-            currentNode.setValue(currentNode.getValue() + gameScore);
+            currentNode.setValue(currentNode.getValue() + playOutScore);
         }
     }
 
-    public Optional<Tree<Double>.Node> run() throws ExecutionException, InterruptedException {
-        long initTime = System.currentTimeMillis();
-        long executionTimeMillis = 5000;
-        int i = 0;
-        while (i < 10000) {
-            Tree<Double>.Node selectNode = selection();
-            if (!selectNode.getState().getGameState().getWinner().isEmpty()) {
-                // TODO Check is this the right thing to do.
-                backPropagation(selectNode, calcGameScore(selectNode.getState(), selectNode.getState().getTurn()));
-            } else {
-                Tree<Double>.Node expandNode = expansion(selectNode);
-//            for (Tree<Double>.Node node : expandNodes) {
-//                PlayOut playOut = new PlayOut(node, ai);
-//                Future<Double> gameScoreFuture = executorService.submit(playOut);
-//                nodeGameScoreMap.put(node, gameScoreFuture);
-//            }
-//            Future<Double> gameScoreFuture = nodeGameScoreMap.get(expandNodes.get(0));
-//            double gameScore = gameScoreFuture.get();
-//            if (gameScore < 0) throw new IllegalArgumentException("The gamescore should not be less than 0!");
-                double gameScore = playOut(expandNode);
-                backPropagation(expandNode, gameScore);
-            }
-            i++;
+    public void next() {
+        this.selectNode = selection();
+        if (!selectNode.getState().getGameState().getWinner().isEmpty()) {
+            this.expandNode = this.selectNode;
+            this.playOutScore = calcGameScore(expandNode.getState(), expandNode.getState().getTurn());
+        } else {
+            this.expandNode = expansion();
+            this.playOutScore = playOut();
         }
+        backPropagation();
+    }
+
+    public Optional<Tree<Move, AiState, Double>.Node> getOptimalNode() {
+        return tree.getRoot().getChildren().stream().max(Comparator.comparingInt(n -> n.getVisits()));
+    }
+
+    // TODO REMOVE
+    public void printInfo() {
         System.out.println(EfficiencyCalculator.getRatio());
-        System.out.println("Completed: " + i + " loops.");
-        executorService.shutdown();
         if (tree.getRoot().getChildren().isEmpty()) throw new NoSuchElementException("There are no available moves!");
-        for (Tree<Double>.Node child : tree.getRoot().getChildren()) {
-            if (child.getMove() instanceof Move.SingleMove s)
+        for (Tree<Move, AiState, Double>.Node child : tree.getRoot().getChildren()) {
+            if (child.getEdgeValue() instanceof Move.SingleMove s)
                 System.out.println("Move: " + s.destination + " has score: " + child.getValue());
-            if (child.getMove() instanceof Move.DoubleMove d)
+            if (child.getEdgeValue() instanceof Move.DoubleMove d)
                 System.out.println("Move: " + d.destination2 + " has score: " + child.getValue());
         }
-        return tree.getRoot().getChildren().stream().max(Comparator.comparingInt(n -> n.getVisits()));
     }
 }
