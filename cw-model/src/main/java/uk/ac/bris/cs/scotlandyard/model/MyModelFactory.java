@@ -18,16 +18,12 @@ import java.util.Set;
 public final class MyModelFactory implements Factory<Model> {
 
 	private final class MyModel implements Model {
-		private GameSetup setup;
 		private Player mrX;
-		private ImmutableList<Player> detectives;
 		private Set<Observer> observers;
 		private Board.GameState state;
 
 		private MyModel(GameSetup setup, Player MrX, ImmutableList<Player> detectives) {
-			this.setup = setup;
 			this.mrX = MrX;
-			this.detectives = detectives;
 			this.observers = new HashSet<>();
 			this.state = new MyGameStateFactory().build(setup, mrX, detectives);
 		}
@@ -40,16 +36,14 @@ public final class MyModelFactory implements Factory<Model> {
 
 		@Override
 		public void registerObserver(@Nonnull Observer observer) {
-			if (observer == null) throw new NullPointerException("The observer is null!");
-			if (observers.contains(observer))
+            if (observers.contains(observer))
 				throw new IllegalArgumentException("This observer already exists.");
 			observers.add(observer);
 		}
 
 		@Override
 		public void unregisterObserver(@Nonnull Observer observer) {
-			if (observer == null) throw new NullPointerException("The observer is null");
-			if (!observers.contains(observer))
+            if (!observers.contains(observer))
 				throw new IllegalArgumentException("This observer was not registered.");
 			observers.remove(observer);
 		}

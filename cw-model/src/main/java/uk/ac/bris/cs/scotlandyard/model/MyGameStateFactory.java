@@ -7,7 +7,9 @@ import javax.annotation.Nonnull;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -126,20 +128,20 @@ public final class MyGameStateFactory implements Factory<GameState> {
             return makeSingleMoves(setup, detectives, mrX, mrX.location()).stream().allMatch(m -> detectiveLocations.contains(m.destination));
         }
 
-        private void checkWinningConditions() {
+        private ImmutableSet<Piece> setupWinner() {
             ImmutableSet<Piece> detectivePieces = ImmutableSet.copyOf(detectives.stream().map(d -> d.piece()).toList());
             ImmutableSet<Piece> mrXPiece = ImmutableSet.of(mrX.piece());
 
             if (detectives.stream().anyMatch(d -> d.location() == mrX.location())
             || (getAvailableMoves().isEmpty() && remaining.contains(mrX.piece()))
             || (checkMrXCornered() && remaining.contains(mrX.piece()))) {
-                winner = detectivePieces;
                 moves = ImmutableSet.of();
+                return detectivePieces;
             } else if (!checkDetectivesCanMove() || setup.moves.size() == log.size() && remaining.contains(mrX.piece())) {
-                winner = mrXPiece;
                 moves = ImmutableSet.of();
+                return mrXPiece;
             } else {
-                winner = ImmutableSet.of();
+                return ImmutableSet.of();
             }
         }
 
@@ -155,10 +157,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.log = log;
             this.mrX = mrX;
             this.detectives = detectives;
+            this.winner = setupWinner();
 
             validateConstructor();
             initMoves();
-            checkWinningConditions();
         }
 
         @Nonnull
