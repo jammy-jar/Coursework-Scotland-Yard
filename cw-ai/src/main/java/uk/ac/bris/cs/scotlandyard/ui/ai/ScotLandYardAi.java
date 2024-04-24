@@ -30,7 +30,6 @@ public class ScotLandYardAi {
     public static LocationDistanceLookup LOOKUP = null;
     public static ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> defaultGraph;
 
-
     public static final ImmutableSet<Integer> MRX_START_LOCATIONS =
             ImmutableSet.of(35, 45, 51, 71, 78, 104, 106, 127, 132, 166, 170, 172);
     // All locations that can be reached directly from the start locations.

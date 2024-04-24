@@ -7,6 +7,7 @@ import uk.ac.bris.cs.scotlandyard.model.ScotlandYard;
 import java.util.*;
 
 public class Dijkstra {
+    // Finds the shortest distance from the start node to every other node in the graph.
     public static Map<Integer, Integer> findShortestPath(ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph, int startNode) {
         Map<Integer, Integer> nodeDistanceMap = new HashMap<>();
         nodeDistanceMap.put(startNode, 0);

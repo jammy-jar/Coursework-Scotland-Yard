@@ -13,10 +13,8 @@ public class LocationDistanceLookup {
 
     private Map<Integer, Map<Integer, Integer>> initValues() {
         Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
-
         for (int source : graph.nodes())
             map.put(source, Dijkstra.findShortestPath(graph, source));
-
         return map;
     }
     public LocationDistanceLookup(ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph) {

@@ -30,15 +30,13 @@ public class MyAi implements Ai {
 		else currentPlayer = Optional.empty();
 
 		AiType ai;
-		if (currentPlayer.isPresent() && currentPlayer.get().isMrX())
-			ai = AiType.MRX;
-		else
-			ai = AiType.DETECTIVES;
+		if (currentPlayer.isPresent() && currentPlayer.get().isMrX()) ai = AiType.MRX;
+		else ai = AiType.DETECTIVES;
 
 		MCTS mcts = initMCTS(board, ai);
 		for (int i = 0; i < ScotLandYardAi.ITERATIONS; i++)
 			mcts.next();
-		mcts.printInfo();
+
 		Optional<Tree<Move, AiState, Double>.Node> node = mcts.getOptimalNode();
 
         if (node.isEmpty()) throw new NoSuchElementException("A best move could not be found!");
