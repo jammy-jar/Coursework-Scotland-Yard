@@ -162,6 +162,7 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
         @Nonnull
         @Override
         public AiState advance(Move move) {
+            this.possibleMrXLocations.removeIf(p -> p.equals(Utils.movesFinalDestination(move)));
             Board.GameState newGameState = state.advance(move);
             Optional<Piece> nextTurn = newGameState.getAvailableMoves().stream().map(m -> m.commencedBy()).findFirst();
             if (nextTurn.isPresent() && nextTurn.get().isMrX())
