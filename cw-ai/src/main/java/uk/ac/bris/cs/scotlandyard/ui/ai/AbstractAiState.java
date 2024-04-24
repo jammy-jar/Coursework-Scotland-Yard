@@ -8,7 +8,7 @@ public abstract class AbstractAiState implements AiState {
         int categoryCount = 5;
         // Assign each location a category based on its distance from the nearest detective.
         for (Integer location : possibleMrXLocations)
-            map.put(location, new Category(Math.min(MyAi.LOOKUP.getMinDistance(location, detectiveLocations), categoryCount)));
+            map.put(location, new Category(Math.min(ScotLandYardAi.LOOKUP.getMinDistance(location, detectiveLocations), categoryCount)));
         return map;
     }
 

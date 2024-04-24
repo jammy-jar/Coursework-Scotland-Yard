@@ -1,25 +1,26 @@
 package uk.ac.bris.cs.scotlandyard.ui.ai;
 
-import com.google.common.graph.Traverser;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board;
+import uk.ac.bris.cs.scotlandyard.model.ScotlandYard;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class LocationDistanceLookup {
-    private final Board board;
+    private final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph;
     private static Map<Integer, Map<Integer, Integer>> locationDistanceMap;
 
     private Map<Integer, Map<Integer, Integer>> initValues() {
         Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
 
-        for (int source : board.getSetup().graph.nodes())
-            map.put(source, Dijkstra.findShortestPath(board, source));
+        for (int source : graph.nodes())
+            map.put(source, Dijkstra.findShortestPath(graph, source));
 
         return map;
     }
-    public LocationDistanceLookup(Board board) {
-        this.board = board;
+    public LocationDistanceLookup(ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph) {
+        this.graph = graph;
         locationDistanceMap = initValues();
     }
 
@@ -28,7 +29,7 @@ public class LocationDistanceLookup {
     }
 
     public int getMinDistance(int source, Set<Integer> destinations) {
-        OptionalInt distance = destinations.stream().mapToInt(l -> MyAi.LOOKUP.getDistance(source, l)).min();
+        OptionalInt distance = destinations.stream().mapToInt(l -> ScotLandYardAi.LOOKUP.getDistance(source, l)).min();
         if (distance.isEmpty()) throw new NoSuchElementException("Destination locations is empty!");
         return distance.getAsInt();
     }

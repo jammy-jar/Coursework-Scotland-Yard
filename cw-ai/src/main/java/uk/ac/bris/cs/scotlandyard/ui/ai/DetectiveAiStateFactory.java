@@ -82,7 +82,7 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
                 for (Integer mrXLoc : possibleMrXLocations) {
                     if (!(move instanceof Move.SingleMove singleMove))
                         throw new RuntimeException("Detectives can only make single moves!");
-                    total += MyAi.LOOKUP.getDistance(mrXLoc, singleMove.destination);
+                    total += ScotLandYardAi.LOOKUP.getDistance(mrXLoc, singleMove.destination);
                 }
                 if (total <= minimum) {
                     minimum = total;
@@ -102,7 +102,7 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
             for (Move move : moves) {
                 if (!(move instanceof Move.SingleMove singleMove))
                     throw new RuntimeException("Detectives can only make single moves!");
-                int distance = MyAi.LOOKUP.getDistance(assumedMrXLocation, singleMove.destination);
+                int distance = ScotLandYardAi.LOOKUP.getDistance(assumedMrXLocation, singleMove.destination);
                 if (distance <= minimum) {
                     minimum = distance;
                     minMove = move;
@@ -126,6 +126,12 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
         @Override
         public Set<Integer> getPossibleMrXLocations() {
             return possibleMrXLocations;
+        }
+
+        @Nonnull
+        @Override
+        public Set<Integer> getDetectiveLocations() {
+            return detectiveLocations;
         }
 
         @Nonnull

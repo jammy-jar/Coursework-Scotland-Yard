@@ -12,8 +12,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class MyAi implements Ai {
-
-	public static LocationDistanceLookup LOOKUP = null;
 	public static AiState previousAiState = null;
 
 	@Nonnull @Override public String name() { return "Jammar"; }
@@ -21,10 +19,10 @@ public class MyAi implements Ai {
 	@Nonnull @Override public Move pickMove(
 			@Nonnull Board board,
 			Pair<Long, TimeUnit> timeoutPair) {
-		// As soon as the first move is made populate the location-distance lookup table.
-		// This is to initialise the distance between all pairs of locations for increased efficiency.
-		if (LOOKUP == null)
-			LOOKUP = new LocationDistanceLookup(board);
+		if (ScotLandYardAi.defaultGraph == null)
+			ScotLandYardAi.setUp();
+		if (ScotLandYardAi.LOOKUP == null)
+			ScotLandYardAi.initLookup();
 
 		Optional<Piece> currentPlayer;
 		Optional<Move> someMove = board.getAvailableMoves().stream().findFirst();

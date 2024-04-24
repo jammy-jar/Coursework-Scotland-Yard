@@ -15,6 +15,8 @@ public interface AiState {
     @Nonnull
     Set<Integer> getPossibleMrXLocations();
     @Nonnull
+    Set<Integer> getDetectiveLocations();
+    @Nonnull
     Optional<Piece> getTurn();
     @Nonnull
     List<Move> getMoves();

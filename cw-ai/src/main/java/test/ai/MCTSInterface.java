@@ -8,6 +8,10 @@ public class MCTSInterface extends MCTS {
         super(state, ai);
     }
 
+    public AiType getAi() {
+        return super.ai;
+    }
+
     public Tree<Move, AiState, Double>.Node getSelectNode() {
         return super.selectNode;
     }
@@ -15,6 +19,11 @@ public class MCTSInterface extends MCTS {
     public Tree<Move, AiState, Double>.Node getExpandNode() {
         return super.expandNode;
     }
+
+    public Tree<Move, AiState, Double> getTree() {
+        return super.tree;
+    }
+
 
     public double getPlayOutScore() {
         return super.playOutScore;
