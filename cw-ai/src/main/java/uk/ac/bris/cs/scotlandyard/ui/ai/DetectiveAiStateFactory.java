@@ -49,7 +49,7 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
 
             // Sorts, so that the order is determined. Sort by enum, eg. Piece.Detective.BLUE declared before Piece.Detective.RED, so blue will be picked first.
             Optional<Piece> turn = state.getAvailableMoves().stream().map(m -> m.commencedBy()).sorted().findFirst();
-            this.turn = turn.orElseThrow(() -> new NoSuchElementException("There are no remaining players! (It is likely the detectives have no available moves)."));
+            this.turn = turn.orElse(null);
             this.moves = filterMoves(state.getAvailableMoves());
         }
 
@@ -146,7 +146,6 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
         @Nonnull
         @Override
         public AiState advance(Move move) {
-            this.possibleMrXLocations.removeIf(p -> p.equals(Utils.movesFinalDestination(move)));
             Board.GameState newGameState = state.advance(move);
             Optional<Piece> nextTurn = newGameState.getAvailableMoves().stream().map(m -> m.commencedBy()).findFirst();
             if (nextTurn.isPresent() && nextTurn.get().isMrX())

@@ -34,7 +34,8 @@ public class MyAi implements Ai {
 		else ai = AiType.DETECTIVES;
 
 		MCTS mcts = initMCTS(board, ai);
-		for (int i = 0; i < ScotLandYardAi.ITERATIONS; i++)
+		long init = System.currentTimeMillis();
+		while (System.currentTimeMillis() - init < ScotLandYardAi.MOVE_TIME_MS)
 			mcts.next();
 
 		Optional<Tree<Move, AiState, Double>.Node> node = mcts.getOptimalNode();

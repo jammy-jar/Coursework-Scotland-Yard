@@ -25,7 +25,7 @@ public class ScotLandYardAi {
     public final static double DETECTIVE_EPSILON = 0.2;
     public final static double COALITION_REDUCTION_CONSTANT = 0.5;
 
-    public final static double ITERATIONS = 1000;
+    public final static long MOVE_TIME_MS = 1000;
 
     public static LocationDistanceLookup LOOKUP = null;
     public static ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> defaultGraph;

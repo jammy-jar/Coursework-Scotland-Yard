@@ -116,10 +116,8 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             LogEntry log = state.getMrXTravelLog().get(moveNum - 1);
 
             if (state.getSetup().moves.get(moveNum - 1)) {
-                if (log.location().isPresent())
-                    return new HashSet<>(Set.of(log.location().get()));
-                else
-                    throw new NoSuchElementException("The Log Entry of the last move is not present!");
+                if (log.location().isPresent()) return new HashSet<>(Set.of(log.location().get()));
+                else throw new NoSuchElementException("The Log Entry of the last move is not present!");
             } else {
                 Set<Integer> locations = new HashSet<>();
                 for (Integer location : prevMrXLocations)
@@ -137,6 +135,9 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             Set<Integer> locations = new HashSet<>(calcLocationsAtMove(newState, detectiveLocations, prevMrXLocations, moveNum));
             if (madeDoubleMove)
                 locations.addAll(calcLocationsAtMove(newState, detectiveLocations, prevMrXLocations, moveNum - 1));
+
+            if (locations.isEmpty() && newState.getWinner().isEmpty())
+                throw new NoSuchElementException("There are no possible MrX locations (MrX moved unexpectedly).");
             return locations;
         }
 
