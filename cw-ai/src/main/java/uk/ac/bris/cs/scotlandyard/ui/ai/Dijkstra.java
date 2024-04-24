@@ -1,12 +1,13 @@
 package uk.ac.bris.cs.scotlandyard.ui.ai;
 
-import com.google.common.graph.ValueGraph;
-import uk.ac.bris.cs.scotlandyard.model.Board;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.graph.ImmutableValueGraph;
+import uk.ac.bris.cs.scotlandyard.model.ScotlandYard;
 
 import java.util.*;
 
 public class Dijkstra {
-    public static Map<Integer, Integer> findShortestPath(Board board, int startNode) {
+    public static Map<Integer, Integer> findShortestPath(ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph, int startNode) {
         Map<Integer, Integer> nodeDistanceMap = new HashMap<>();
         nodeDistanceMap.put(startNode, 0);
 
@@ -16,7 +17,7 @@ public class Dijkstra {
         while (!pq.isEmpty()) {
             int current = pq.poll();
 
-            for (int neighbor : board.getSetup().graph.adjacentNodes(current)) {
+            for (int neighbor : graph.adjacentNodes(current)) {
                 int distance = nodeDistanceMap.get(current) + 1;
 
                 if (!nodeDistanceMap.containsKey(neighbor) || distance < nodeDistanceMap.get(neighbor)) {
