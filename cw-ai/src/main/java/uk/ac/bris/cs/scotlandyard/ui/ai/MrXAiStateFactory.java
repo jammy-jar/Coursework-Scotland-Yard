@@ -45,12 +45,7 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 throw new NoSuchElementException("There are no available moves for this player!");
 
             for (Move move : moves) {
-                int distance;
-                if (move instanceof Move.SingleMove s)
-                    distance = MyAi.LOOKUP.getMinDistance(s.destination, detectiveLocations);
-                else if (move instanceof Move.DoubleMove d)
-                    distance = MyAi.LOOKUP.getMinDistance(d.destination2, detectiveLocations);
-                else throw new RuntimeException("This move type is not valid!");
+                int distance = ScotLandYardAi.LOOKUP.getMinDistance(Utils.movesFinalDestination(move), detectiveLocations);
                 if (distance >= maximum) {
                     maximum = distance;
                     maxMove = move;
@@ -75,6 +70,12 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         @Override
         public Set<Integer> getPossibleMrXLocations() {
             return possibleMrXLocations;
+        }
+
+        @Nonnull
+        @Override
+        public Set<Integer> getDetectiveLocations() {
+            return detectiveLocations;
         }
 
         @Nonnull
@@ -173,6 +174,7 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         // We apply move filtering so black tickets & double tickets aren't wasted.
         private List<Move> filterMoves(ImmutableSet<Move> availableMoves) {
             /* Our Rules:
+            MrX Should never move next to a detective unless its his only choice.
             SECRET tickets shouldn't be used when:
             1. On round 1 or 2.
             2. MrX reveals his location.
@@ -204,7 +206,15 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             } else filteredMovesPt1.addAll(availableMoves);
             Set<Move> filteredMovesPt2 = new HashSet<>(filterDoubleMoves(filteredMovesPt1));
 
-            if (!filteredMovesPt2.isEmpty()) return filteredMovesPt2.stream().toList();
+            Set<Move> filteredMovesPt3 = new HashSet<>();
+            for (Move move : filteredMovesPt2) {
+                if (ScotLandYardAi.LOOKUP.getMinDistance(Utils.movesFinalDestination(move), detectiveLocations) > 1)
+                    filteredMovesPt3.add(move);
+            }
+            if (filteredMovesPt3.isEmpty())
+                filteredMovesPt3.addAll(filteredMovesPt2);
+
+            if (!filteredMovesPt3.isEmpty()) return filteredMovesPt3.stream().toList();
             else return availableMoves.stream().toList();
         }
 
