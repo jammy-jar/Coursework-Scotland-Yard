@@ -3,7 +3,7 @@ package uk.ac.bris.cs.scotlandyard.ui.ai;
 import java.util.*;
 
 public abstract class AbstractAiState implements AiState {
-    protected Map<Integer, Category> createLocationCategoryMap(Set<Integer> possibleMrXLocations, Set<Integer> detectiveLocations) {
+    protected static Map<Integer, Category> createLocationCategoryMap(Set<Integer> possibleMrXLocations, Set<Integer> detectiveLocations) {
         HashMap<Integer, Category> map = new HashMap<>();
         int categoryCount = 5;
         // Assign each location a category based on its distance from the nearest detective.
@@ -12,7 +12,8 @@ public abstract class AbstractAiState implements AiState {
         return map;
     }
 
-    protected Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
+    // Use weightings and category map to pick an assumed location for MrX.
+    protected static Integer selectAssumedMrXLocation(Map<Integer, Category> categoryMap) {
             Optional<Double> weightSum = categoryMap.values().stream().map(c -> c.getWeight()).reduce((s, w) -> s + w);
             if (weightSum.isEmpty())
                 throw new NoSuchElementException("The category map is empty!");

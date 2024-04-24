@@ -93,18 +93,14 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         @Nonnull
         @Override
         public Move applyHeuristic(Heuristic heuristic) {
-            Move move;
-            if (heuristic == Heuristic.NONE) return calcRandomMove();
-            else {
-                long initialTime = System.currentTimeMillis();
-                if (heuristic == Heuristic.MCD) move = calcMCDHeuristic();
-                else throw new IllegalArgumentException("This heuristic is not valid for MrX");
-                EfficiencyCalculator.calcMCDHeuristicTime += System.currentTimeMillis() - initialTime;
-            }
-            return move;
+            return switch (heuristic) {
+                case NONE -> calcRandomMove();
+                case MCD -> calcMCDHeuristic();
+                case MTD, CAL -> throw new IllegalArgumentException("This heuristic is not valid for MrX!");
+            };
         }
 
-        public static Set<Integer> calcMrXReachableLocations(Board.GameState state, Set<Integer> detectiveLocations, Integer source, ScotlandYard.Ticket ticket) {
+        private Set<Integer> calcMrXReachableLocations(Board.GameState state, Set<Integer> detectiveLocations, Integer source, ScotlandYard.Ticket ticket) {
             Set<Integer> locations = new HashSet<>();
             for (Integer destination : state.getSetup().graph.adjacentNodes(source)) {
                 if (!detectiveLocations.contains(destination)) {
@@ -116,51 +112,32 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
             return locations;
         }
 
-        public static Set<Integer> updatePossibleMrXLocations(Board.GameState oldState, Board.GameState newState, Set<Integer> detectiveLocations, Set<Integer> prevMrXLocations) {
-            int moveNum = newState.getMrXTravelLog().size();
-            LogEntry latestLog = newState.getMrXTravelLog().get(moveNum - 1);
+        private Set<Integer> calcLocationsAtMove(Board.GameState state, Set<Integer> detectiveLocations, Set<Integer> prevMrXLocations, int moveNum) {
+            LogEntry log = state.getMrXTravelLog().get(moveNum - 1);
 
+            if (state.getSetup().moves.get(moveNum - 1)) {
+                if (log.location().isPresent())
+                    return new HashSet<>(Set.of(log.location().get()));
+                else
+                    throw new NoSuchElementException("The Log Entry of the last move is not present!");
+            } else {
+                Set<Integer> locations = new HashSet<>();
+                for (Integer location : prevMrXLocations)
+                    locations.addAll(calcMrXReachableLocations(state, detectiveLocations, location, log.ticket()));
+
+                return locations;
+            }
+        }
+
+        private Set<Integer> updatePossibleMrXLocations(Board.GameState oldState, Board.GameState newState, Set<Integer> detectiveLocations, Set<Integer> prevMrXLocations) {
+            int moveNum = newState.getMrXTravelLog().size();
             int lastMoveNum = oldState.getMrXTravelLog().size();
             boolean madeDoubleMove = moveNum - lastMoveNum == 2;
 
-            if (!madeDoubleMove) {
-                if (newState.getSetup().moves.get(moveNum - 1)) {
-                    if (latestLog.location().isPresent())
-                        return new HashSet<>(Set.of(latestLog.location().get()));
-                    else
-                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
-                } else {
-                    Set<Integer> locations = new HashSet<>();
-                    for (Integer location : prevMrXLocations)
-                        locations.addAll(calcMrXReachableLocations(newState, detectiveLocations, location, latestLog.ticket()));
-
-                    return locations;
-                }
-            } else {
-                LogEntry secondMostLatestLog = newState.getMrXTravelLog().get(moveNum - 2);
-                Set<Integer> firstLocations = new HashSet<>();
-                if (newState.getSetup().moves.get(moveNum - 2)) {
-                    if (secondMostLatestLog.location().isPresent())
-                        firstLocations.add(secondMostLatestLog.location().get());
-                    else
-                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
-                } else {
-                    for (Integer location : prevMrXLocations)
-                        firstLocations.addAll(calcMrXReachableLocations(newState, detectiveLocations, location, secondMostLatestLog.ticket()));
-                }
-
-                if (newState.getSetup().moves.get(moveNum - 1)) {
-                    if (latestLog.location().isPresent())
-                        return new HashSet<>(Set.of(latestLog.location().get()));
-                    else
-                        throw new NoSuchElementException("The Log Entry of the last move is not present!");
-                } else {
-                    Set<Integer> locations = new HashSet<>();
-                    for (int location : firstLocations)
-                        locations.addAll(calcMrXReachableLocations(newState, detectiveLocations, location, latestLog.ticket()));
-                    return locations;
-                }
-            }
+            Set<Integer> locations = new HashSet<>(calcLocationsAtMove(newState, detectiveLocations, prevMrXLocations, moveNum));
+            if (madeDoubleMove)
+                locations.addAll(calcLocationsAtMove(newState, detectiveLocations, prevMrXLocations, moveNum - 1));
+            return locations;
         }
 
         // Filter so that double moves are only made if no other moves can be made.
@@ -191,9 +168,11 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
 
             Set<Move> filteredMovesPt1 = new HashSet<>();
             int round = state.getMrXTravelLog().size();
-            if (round <= 2
+            boolean removeSecretMoveConditions = round <= 2
                     || round < state.getSetup().moves.size() && state.getSetup().moves.get(round)
-                    || connectingEdges.stream().allMatch(t -> t == ScotlandYard.Ticket.TAXI)) {
+                    || connectingEdges.stream().allMatch(t -> t == ScotlandYard.Ticket.TAXI);
+
+            if (removeSecretMoveConditions) {
                 // Filter out SingleMoves or DoubleMoves where one or more of the tickets is a secret ticket.
                 for (Move move : availableMoves) {
                     if (move instanceof Move.SingleMove s && s.ticket != ScotlandYard.Ticket.SECRET)
@@ -204,6 +183,7 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
                 }
                 if (filteredMovesPt1.isEmpty()) filteredMovesPt1.addAll(availableMoves);
             } else filteredMovesPt1.addAll(availableMoves);
+
             Set<Move> filteredMovesPt2 = new HashSet<>(filterDoubleMoves(filteredMovesPt1));
 
             Set<Move> filteredMovesPt3 = new HashSet<>();
@@ -222,21 +202,15 @@ public class MrXAiStateFactory implements ScotLandYardAi.Factory<AiState> {
         @Override
         public AiState advance(Move move) {
             Board.GameState newGameState = state.advance(move);
-            long initialTime = System.currentTimeMillis();
             Set<Integer> newDetectiveLocations = Utils.initDetectiveLocations(newGameState);
             Set<Integer> newMrXLocations = updatePossibleMrXLocations(this.state, newGameState, newDetectiveLocations, this.possibleMrXLocations);
             if (!newGameState.getWinner().isEmpty())
                 return new DetectiveAiStateFactory().build(newGameState, newMrXLocations);
 
-            EfficiencyCalculator.initPossibleMrXLocationsTime += System.currentTimeMillis() - initialTime;
-            initialTime = System.currentTimeMillis();
             Map<Integer, Category> newCategoryMap = createLocationCategoryMap(newMrXLocations, newDetectiveLocations);
-            EfficiencyCalculator.initLocationCategoryMapTime += System.currentTimeMillis() - initialTime;
-            initialTime = System.currentTimeMillis();
             int newAssumedLocation = selectAssumedMrXLocation(newCategoryMap);
-            EfficiencyCalculator.selectAssumedMrXLocationTime += System.currentTimeMillis() - initialTime;
 
-            return new DetectiveAiStateFactory().build(newGameState, newMrXLocations, newCategoryMap, newAssumedLocation);
+            return new DetectiveAiStateFactory().build(newGameState, newMrXLocations, newAssumedLocation);
         }
     }
 }

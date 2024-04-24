@@ -22,8 +22,8 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
     }
 
     @Nonnull
-    public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations, Map<Integer, Category> categoryMap, int assumedMrXLocation) {
-        return new DetectiveAiState(state, possibleMrXLocations, categoryMap, assumedMrXLocation);
+    public AiState build(Board.GameState state, Set<Integer> possibleMrXLocations, int assumedMrXLocation) {
+        return new DetectiveAiState(state, possibleMrXLocations, assumedMrXLocation);
     }
 
     private class DetectiveAiState extends AbstractAiState {
@@ -31,7 +31,6 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
         private final Piece turn;
         private final Set<Integer> possibleMrXLocations;
         private final Set<Integer> detectiveLocations;
-        private final Map<Integer, Category> categoryMap;
         private final Integer assumedMrXLocation;
         private final List<Move> moves;
 
@@ -42,33 +41,20 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
             return availableMoves.stream().filter(m -> m.commencedBy() == turn).toList();
         }
 
-        public DetectiveAiState(Board.GameState state, Set<Integer> mrXLocations) {
+        public DetectiveAiState(Board.GameState state, Set<Integer> mrXLocations, int assumedMrXLocation) {
             this.state = state;
             this.detectiveLocations = Utils.initDetectiveLocations(state);
             this.possibleMrXLocations = mrXLocations;
-            this.categoryMap = this.createLocationCategoryMap(possibleMrXLocations, detectiveLocations);
-            this.assumedMrXLocation = this.selectAssumedMrXLocation(categoryMap);
-
-            // Sorts, so that the order is determined. Sort by enum, eg. Piece.Detective.BLUE declared before Piece.Detective.RED, so blue will be picked first.
-            Optional<Piece> turn = state.getAvailableMoves().stream().map(m -> m.commencedBy()).sorted().findFirst();
-            if (turn.isEmpty())
-                throw new NoSuchElementException("There are no remaining players! (It is likely the detectives have no available moves).");
-            this.turn = turn.get();
-            this.moves = filterMoves(state.getAvailableMoves());
-        }
-
-        public DetectiveAiState(Board.GameState state, Set<Integer> mrXLocations, Map<Integer, Category> locationCategorisationMap, int assumedMrXLocation) {
-            this.state = state;
-            this.detectiveLocations = Utils.initDetectiveLocations(state);
-            this.possibleMrXLocations = mrXLocations;
-            this.categoryMap = locationCategorisationMap;
             this.assumedMrXLocation = assumedMrXLocation;
 
             // Sorts, so that the order is determined. Sort by enum, eg. Piece.Detective.BLUE declared before Piece.Detective.RED, so blue will be picked first.
             Optional<Piece> turn = state.getAvailableMoves().stream().map(m -> m.commencedBy()).sorted().findFirst();
-            // throw new NoSuchElementException("There are no remaining players! (It is likely the detectives have no available moves).");
-            this.turn = turn.orElse(null);
+            this.turn = turn.orElseThrow(() -> new NoSuchElementException("There are no remaining players! (It is likely the detectives have no available moves)."));
             this.moves = filterMoves(state.getAvailableMoves());
+        }
+
+        public DetectiveAiState(Board.GameState state, Set<Integer> mrXLocations) {
+            this(state, mrXLocations, selectAssumedMrXLocation(createLocationCategoryMap(mrXLocations, Utils.initDetectiveLocations(state))));
         }
 
         // Finding the 'Minimum total distance'.
@@ -149,14 +135,12 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
 
         @Nonnull
         public Move applyHeuristic(Heuristic heuristic) {
-            Move move;
-            if (heuristic == Heuristic.NONE) return calcRandomMove();
-            long initialTime = System.currentTimeMillis();
-            if (heuristic == Heuristic.MTD) move = calcMTDHeuristic();
-            else if (heuristic == Heuristic.CAL) move = calcCALHeuristic();
-            else throw new IllegalArgumentException("This heuristic is not valid for Detectives");
-            EfficiencyCalculator.calcMTDORCALHeuristicTime += System.currentTimeMillis() - initialTime;
-            return move;
+            return switch (heuristic) {
+                case NONE -> calcRandomMove();
+                case MTD -> calcMTDHeuristic();
+                case CAL -> calcCALHeuristic();
+                case MCD -> throw new IllegalArgumentException("This heuristic is not valid for Detectives");
+            };
         }
 
         @Nonnull
@@ -167,7 +151,7 @@ public class DetectiveAiStateFactory implements ScotLandYardAi.Factory<AiState> 
             Optional<Piece> nextTurn = newGameState.getAvailableMoves().stream().map(m -> m.commencedBy()).findFirst();
             if (nextTurn.isPresent() && nextTurn.get().isMrX())
                 return new MrXAiStateFactory().build(newGameState, this.possibleMrXLocations);
-            return new DetectiveAiStateFactory().build(newGameState, this.possibleMrXLocations, this.categoryMap, this.assumedMrXLocation);
+            return new DetectiveAiStateFactory().build(newGameState, this.possibleMrXLocations, this.assumedMrXLocation);
         }
     }
 }
