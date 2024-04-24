@@ -1,10 +1,7 @@
-package test.ai;
+package uk.ac.bris.cs.scotlandyard.ui.ai;
 
-import org.assertj.core.api.Assertions;
+import org.junit.Test;
 import uk.ac.bris.cs.scotlandyard.model.*;
-import uk.ac.bris.cs.scotlandyard.ui.ai.*;
-
-import java.util.Comparator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static uk.ac.bris.cs.scotlandyard.model.Piece.Detective.BLUE;
@@ -14,13 +11,13 @@ import static uk.ac.bris.cs.scotlandyard.model.ScotlandYard.defaultDetectiveTick
 import static uk.ac.bris.cs.scotlandyard.model.ScotlandYard.defaultMrXTickets;
 import static uk.ac.bris.cs.scotlandyard.ui.ai.Utils.movesFinalDestination;
 
-public class AiStateTest {
-
-    public static void testPossibleMrXLocations(GameSetup setup) {
+public class AiStateFactoryTest extends TestBase {
+    @Test
+    public void testPossibleMrXLocations() {
         var black = new Player(MRX, defaultMrXTickets(), 45);
         var red = new Player(RED, defaultDetectiveTickets(), 111);
         var blue = new Player(BLUE, defaultDetectiveTickets(), 94);
-        Board.GameState state = new MyGameStateFactory().build(setup, black, red, blue);
+        Board.GameState state = new MyGameStateFactory().build(standard24MoveSetup(), black, red, blue);
         MCTSInterface mcts = new MCTSInterface(new MrXAiStateFactory().build(state), AiType.MRX);
 
         AiState aiState = mcts.getSelectNode().getState();
@@ -32,12 +29,6 @@ public class AiStateTest {
         aiState = aiState.advance(new Move.SingleMove(RED, 110, ScotlandYard.Ticket.TAXI, 111));
         aiState = aiState.advance(new Move.SingleMove(BLUE, 95, ScotlandYard.Ticket.TAXI, 94));
         aiState = aiState.advance(new Move.SingleMove(MRX, 45, ScotlandYard.Ticket.TAXI, 32));
-        System.out.println(aiState.getGameState().getMrXTravelLog());
-        System.out.println(aiState.getGameState().getMrXTravelLog().size());
-
-
-
-        System.out.println(aiState.getPossibleMrXLocations());
 
         assertThat(aiState.getPossibleMrXLocations().size()).isEqualTo(1);
         assertThat(aiState.getPossibleMrXLocations().stream().findFirst().get()).isEqualTo(32);
@@ -49,11 +40,12 @@ public class AiStateTest {
         assertThat(aiState.getPossibleMrXLocations()).containsExactly(33, 19, 44, 45);
     }
 
-    public static void testHeuristic(GameSetup setup) {
+    @Test
+    public void testHeuristic() {
         var black = new Player(MRX, defaultMrXTickets(), 45);
         var red = new Player(RED, defaultDetectiveTickets(), 111);
         var blue = new Player(BLUE, defaultDetectiveTickets(), 94);
-        Board.GameState state = new MyGameStateFactory().build(setup, black, red, blue);
+        Board.GameState state = new MyGameStateFactory().build(standard24MoveSetup(), black, red, blue);
 
         MCTSInterface mcts = new MCTSInterface(new MrXAiStateFactory().build(state), AiType.MRX);
 

@@ -1,4 +1,4 @@
-package test.ai;
+package uk.ac.bris.cs.scotlandyard.ui.ai;
 
 import uk.ac.bris.cs.scotlandyard.model.Move;
 import uk.ac.bris.cs.scotlandyard.ui.ai.*;
@@ -22,10 +22,5 @@ public class MCTSInterface extends MCTS {
 
     public Tree<Move, AiState, Double> getTree() {
         return super.tree;
-    }
-
-
-    public double getPlayOutScore() {
-        return super.playOutScore;
     }
 }
