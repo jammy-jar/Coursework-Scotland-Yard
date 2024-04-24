@@ -1,28 +1,13 @@
 package test.ai;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.common.graph.ImmutableValueGraph;
-import com.google.common.io.Resources;
 import uk.ac.bris.cs.scotlandyard.model.GameSetup;
-import uk.ac.bris.cs.scotlandyard.model.ScotlandYard;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 import static uk.ac.bris.cs.scotlandyard.model.ScotlandYard.STANDARD24MOVES;
-import static uk.ac.bris.cs.scotlandyard.model.ScotlandYard.readGraph;
+import static uk.ac.bris.cs.scotlandyard.ui.ai.ScotLandYardAi.*;
 
 public class TestWorld {
-    private static ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> defaultGraph;
-
-    public static void setUp() {
-        try {
-            defaultGraph = readGraph(Resources.toString(Resources.getResource(
-                            "graph.txt"),
-                    StandardCharsets.UTF_8));
-        } catch (IOException e) { throw new RuntimeException("Unable to read game graph", e); }
-    }
 
     @Nonnull
     static GameSetup standard24MoveSetup() {
@@ -31,7 +16,11 @@ public class TestWorld {
 
     public static void main(String[] args) {
         setUp();
+        initLookup();
 
-        MCTSTest.testMCTS();
+        MCTSTest.testMCTS(standard24MoveSetup());
+        DijkstraTest.testDijkstra();
+        AiStateTest.testPossibleMrXLocations(standard24MoveSetup());
+        AiStateTest.testHeuristic(standard24MoveSetup());
     }
 }

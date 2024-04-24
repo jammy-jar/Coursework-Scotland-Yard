@@ -1,6 +1,7 @@
 package uk.ac.bris.cs.scotlandyard.ui.ai;
 
 import uk.ac.bris.cs.scotlandyard.model.Board;
+import uk.ac.bris.cs.scotlandyard.model.Move;
 import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 import java.util.HashSet;
@@ -16,5 +17,13 @@ public class Utils {
             }
         }
         return detectiveLocations;
+    }
+
+    public static int movesFinalDestination(Move move) {
+        if (move instanceof Move.SingleMove s)
+            return s.destination;
+        else if (move instanceof Move.DoubleMove d)
+            return d.destination2;
+        else throw new RuntimeException("This move type is not valid!");
     }
 }

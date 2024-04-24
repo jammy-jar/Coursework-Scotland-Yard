@@ -8,7 +8,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MCTS {
-    private final AiType ai;
+    protected final AiType ai;
     protected final Tree<Move, AiState, Double> tree;
     private final Map<Move, MoveWrapper> moveWrapperMap;
     protected Tree<Move, AiState, Double>.Node selectNode;
@@ -108,6 +108,8 @@ public class MCTS {
                 aiState = aiState.advance(move);
             }
         }
+        System.out.println(aiState.getGameState().getWinner());
+
 
         double score = calcGameScore(aiState, turn);
         System.out.println("Moves made: " + movesMade.stream().filter(m -> m instanceof Move.SingleMove).map(m -> m.commencedBy()).toList());
